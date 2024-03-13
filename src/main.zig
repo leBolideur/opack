@@ -3,8 +3,6 @@ const macho = std.macho;
 
 const dumper = @import("dumper.zig");
 
-const FormatError = dumper.FormatError;
-
 pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
     var args = std.process.args().inner;
@@ -18,9 +16,9 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    const oFile: *dumper.MachOFile64 = try dumper.MachOFile64.load(&args, allocator);
+    const oFile = dumper.MachOFile64.load(&args, allocator) catch return;
     std.debug.print("{s}\n", .{oFile.filepath});
-    try oFile.dump_header();
+    oFile.dump_header() catch return;
     try oFile.list_load_commands();
 
     defer oFile.close();
