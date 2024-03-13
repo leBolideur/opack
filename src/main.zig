@@ -7,7 +7,6 @@ const FormatError = dumper.FormatError;
 
 pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
-    const stderr = std.io.getStdErr().writer();
     var args = std.process.args().inner;
 
     if (args.count < 2) {
@@ -15,28 +14,16 @@ pub fn main() !void {
         return;
     }
 
-    _ = args.skip();
-    const filepath = args.next().?;
-    const file = std.fs.cwd().openFile(filepath, .{}) catch |err| {
-        try stderr.print("Error loading file: {!}\n", .{err});
-        return;
-    };
-    defer file.close();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer _ = gpa.deinit();
+    const allocator = gpa.allocator();
 
-    const reader = file.reader();
+    const oFile: *dumper.MachOFile64 = try dumper.MachOFile64.load(&args, allocator);
+    std.debug.print("{s}\n", .{oFile.filepath});
+    try oFile.dump_header();
+    try oFile.list_load_commands();
 
-    var header64 = macho.mach_header_64{};
-    dumper.dump_header(&reader, &header64) catch |err| switch (err) {
-        FormatError.NotMachO64 => {
-            try stderr.print("Not a machO64 file\n", .{});
-            return;
-        },
-        else => {
-            try stderr.print("Dumping header error\n", .{});
-            return;
-        },
-    };
-    std.debug.print("magic: {x}\n", .{header64.magic});
+    defer oFile.close();
 }
 
 test "simple test" {}
