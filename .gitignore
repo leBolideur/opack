@@ -1,3 +1,5 @@
 .zed/
 zig-cache/
 zig-out/
+
+samples/bins/

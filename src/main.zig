@@ -17,11 +17,10 @@ pub fn main() !void {
     const allocator = gpa.allocator();
 
     const oFile = dumper.MachOFile64.load(&args, allocator) catch return;
-    std.debug.print("{s}\n", .{oFile.filepath});
+    defer oFile.close();
+
     oFile.dump_header() catch return;
     try oFile.list_load_commands();
-
-    defer oFile.close();
 }
 
 test "simple test" {}
