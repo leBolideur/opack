@@ -88,7 +88,7 @@ pub const MachOFile64 = struct {
 
     fn dump_entrypoint_cmd(self: MachOFile64) DumperError!void {
         const main_cmd = try self.safeReadStruct(macho.entry_point_command);
-        std.debug.print("MAIN         Entry: {d: >11}\n", .{main_cmd.entryoff});
+        std.debug.print("MAIN         Entry: {x: >10}\n", .{main_cmd.entryoff});
     }
 
     fn safeReadStruct(self: MachOFile64, comptime T: type) !T {

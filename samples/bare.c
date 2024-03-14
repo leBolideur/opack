@@ -1,1 +1,6 @@
-int main() { return 0; }
+#include <stdio.h>
+
+int main() {
+  puts("opack\n");
+  return 0;
+}
