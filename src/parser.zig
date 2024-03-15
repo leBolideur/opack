@@ -1,32 +1,35 @@
 const std = @import("std");
 const macho = std.macho;
 
+const OData = @import("odata.zig").OData;
+
 const stdout = std.io.getStdOut().writer();
 const stderr = std.io.getStdErr().writer();
 
 const Reader = std.fs.File.Reader;
 
 const FormatError = error{ NotMachO64, NotExecutable };
-const ReadError = error{ ReadHeader, ReadLoadCommand };
+const ReadError = error{ ReadHeader, ReadLoadCommand, SegCmdBoundary };
 const FileError = error{OpenFileError};
-const ParserError = error{SegCmdBoundary};
-const DumperError = anyerror || FormatError || ReadError || FileError || ParserError;
+const ParserError = anyerror || FormatError || ReadError || FileError;
 
-pub const MachOFile64 = struct {
-    allocator: std.mem.Allocator,
+pub const MachOFile = struct {
+    // allocator: *std.mem.Allocator,
 
     filepath: [:0]const u8,
     file: std.fs.File,
     reader: Reader,
 
     header: macho.mach_header_64,
+    odata: OData,
 
-    pub fn close(self: *MachOFile64) void {
+    pub fn close(self: MachOFile) void {
         self.file.close();
-        self.allocator.destroy(self);
+        // self.sections.deinit();
+        // self.allocator.destroy(self);
     }
 
-    pub fn load(args: *std.process.ArgIteratorPosix, allocator: std.mem.Allocator) DumperError!*MachOFile64 {
+    pub fn load(args: *std.process.ArgIteratorPosix) ParserError!MachOFile {
         _ = args.skip();
         const filepath = args.next().?;
         const file = std.fs.cwd().openFile(filepath, .{}) catch |err| {
@@ -34,20 +37,31 @@ pub const MachOFile64 = struct {
             return FileError.OpenFileError;
         };
 
-        var ptr = try allocator.create(MachOFile64);
+        // var ptr = try allocator.create(MachOFile);
 
-        ptr.* = MachOFile64{
-            .allocator = allocator,
+        // ptr.* =
+        return MachOFile{
+            // .allocator = allocator,
             .filepath = filepath,
             .file = file,
             .reader = file.reader(),
             .header = undefined,
+            .odata = OData.init(),
+            // .sections = std.ArrayList(macho.section_64).init(allocator),
         };
-
-        return ptr;
     }
 
-    pub fn dump_header(self: *MachOFile64) DumperError!void {
+    pub fn parse(self: *MachOFile) ParserError!void {
+        // const odata_ptr = try self.allocator.create(OData);
+        // odata_ptr.* = OData{};
+
+        // return odata_ptr;
+
+        try self.dump_header();
+        self.odata.set_header(&self.header);
+    }
+
+    pub fn dump_header(self: *MachOFile) ParserError!void {
         std.debug.print("Dumping header...\n", .{});
         self.header = self.reader.readStruct(macho.mach_header_64) catch return ReadError.ReadHeader;
 
@@ -63,8 +77,9 @@ pub const MachOFile64 = struct {
         }
     }
 
-    pub fn list_load_commands(self: MachOFile64) DumperError!void {
+    pub fn list_load_commands(self: MachOFile) ParserError!void {
         try stdout.print("{d} load commands found\n\n", .{self.header.ncmds});
+
         for (0..self.header.ncmds) |_| {
             const lcmd = self.reader.readStruct(macho.load_command) catch return ReadError.ReadLoadCommand;
             switch (lcmd.cmd) {
@@ -75,30 +90,40 @@ pub const MachOFile64 = struct {
         }
     }
 
-    fn dump_segment_cmd(self: MachOFile64) DumperError!void {
+    fn dump_segment_cmd(self: MachOFile) ParserError!void {
+        try self.file.seekBy(-@sizeOf(macho.load_command));
         const seg64_cmd = try self.safeReadStruct(macho.segment_command_64);
-        try self.file.seekBy(seg64_cmd.nsects * @sizeOf(macho.section_64));
-
+        // try self.file.seekBy(seg64_cmd.nsects * @sizeOf(macho.section_64));
+        for (0..seg64_cmd.nsects) |_| {
+            try self.dump_section();
+        }
         std.debug.print("SEGMENT_64   SegName: {s: >20}\tNsects: {d}\tcmdsize: {d}\n", .{
             seg64_cmd.segname,
             seg64_cmd.nsects,
             seg64_cmd.cmdsize,
         });
+        // for (self.sections.items) |sec| {
+        //     std.debug.print("\tSecName: {s}\n", .{sec.sectname});
+        // }
     }
 
-    fn dump_entrypoint_cmd(self: MachOFile64) DumperError!void {
+    fn dump_section(self: MachOFile) !void {
+        _ = try self.safeReadStruct(macho.section_64);
+        // try self.sections.append(section);
+    }
+
+    fn dump_entrypoint_cmd(self: MachOFile) ParserError!void {
+        try self.file.seekBy(-@sizeOf(macho.load_command));
         const main_cmd = try self.safeReadStruct(macho.entry_point_command);
         std.debug.print("MAIN         Entry: {x: >10}\n", .{main_cmd.entryoff});
     }
 
-    fn safeReadStruct(self: MachOFile64, comptime T: type) !T {
-        try self.file.seekBy(-@sizeOf(macho.load_command));
-
+    fn safeReadStruct(self: MachOFile, comptime T: type) !T {
         const start_cursor = try self.file.getPos();
         const struct_readed = self.reader.readStruct(T) catch return ReadError.ReadLoadCommand;
         const end_cursor = try self.file.getPos();
 
-        try MachOFile64.check_boundary(start_cursor, end_cursor, @sizeOf(T));
+        try MachOFile.check_boundary(start_cursor, end_cursor, @sizeOf(T));
 
         return struct_readed;
     }
