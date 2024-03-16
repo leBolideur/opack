@@ -23,10 +23,10 @@ pub const MachOFile = struct {
 
     pub fn close(self: *MachOFile) void {
         self.file.close();
-        gpa_alloc.destroy(self);
+        // gpa_alloc.destroy(self);
     }
 
-    pub fn load(args: *std.process.ArgIteratorPosix) ParserError!*MachOFile {
+    pub fn load(args: *std.process.ArgIteratorPosix) ParserError!MachOFile {
         _ = args.skip();
         const filepath = args.next().?;
         const file = std.fs.cwd().openFile(filepath, .{}) catch |err| {
@@ -34,16 +34,16 @@ pub const MachOFile = struct {
             return FileError.OpenFileError;
         };
 
-        var ptr = try gpa_alloc.create(MachOFile);
+        // var ptr = try gpa_alloc.create(MachOFile);
 
-        ptr.* = MachOFile{
+        return MachOFile{
             .filepath = filepath,
             .file = file,
             .reader = file.reader(),
             .odata = try OData.init(),
         };
 
-        return ptr;
+        // return ptr;
     }
 
     pub fn parse(self: *MachOFile) ParserError!*OData {
