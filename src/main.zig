@@ -1,7 +1,6 @@
 const std = @import("std");
 const macho = std.macho;
 
-const parser = @import("parser.zig");
 const OPacker = @import("opacker.zig").OPacker;
 
 pub fn main() !void {

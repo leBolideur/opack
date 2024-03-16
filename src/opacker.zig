@@ -12,18 +12,17 @@ pub const OPacker = struct {
 
     pub fn init(args: *std.process.ArgIteratorPosix) !void {
         var gpa = std.heap.GeneralPurposeAllocator(GPAConfig){};
-        // defer _ = gpa.deinit();
+        defer _ = gpa.deinit();
+
         var allocator = gpa.allocator();
 
         var odata_ptr = try OData.init(&allocator);
-        defer allocator.destroy(odata_ptr);
+        defer odata_ptr.close();
 
         const ofile = try MachOFile.load(args, odata_ptr);
         try ofile.parse();
 
         OPacker.print_test(odata_ptr);
-
-        odata_ptr.close();
 
         // return OPacker{
         //     .odata = odata_ptr,

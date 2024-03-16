@@ -77,5 +77,6 @@ pub const OData = struct {
         }
 
         self.segment_cmds.deinit();
+        self.gpa_alloc.destroy(self);
     }
 };
