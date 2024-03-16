@@ -21,11 +21,6 @@ pub const MachOFile = struct {
 
     odata: *OData,
 
-    pub fn close(self: *MachOFile) void {
-        self.file.close();
-        // gpa_alloc.destroy(self);
-    }
-
     pub fn load(args: *std.process.ArgIteratorPosix) ParserError!MachOFile {
         _ = args.skip();
         const filepath = args.next().?;
@@ -34,21 +29,18 @@ pub const MachOFile = struct {
             return FileError.OpenFileError;
         };
 
-        // var ptr = try gpa_alloc.create(MachOFile);
-
         return MachOFile{
             .filepath = filepath,
             .file = file,
             .reader = file.reader(),
             .odata = try OData.init(),
         };
-
-        // return ptr;
     }
 
     pub fn parse(self: *MachOFile) ParserError!*OData {
         const header = try self.dump_header();
         try self.list_load_commands(&header);
+        self.file.close();
 
         return self.odata;
     }
@@ -59,12 +51,12 @@ pub const MachOFile = struct {
 
         if (header.magic != macho.MH_MAGIC_64) {
             try stderr.print("Not a machO64 file\n", .{});
-            self.close();
+            self.file.close();
             return FormatError.NotMachO64;
         }
         if (header.filetype != macho.MH_EXECUTE) {
             try stderr.print("Dumping header error\n", .{});
-            self.close();
+            self.file.close();
             return FormatError.NotExecutable;
         }
 
@@ -106,8 +98,8 @@ pub const MachOFile = struct {
 
     fn dump_entrypoint_cmd(self: MachOFile) ParserError!void {
         try self.file.seekBy(-@sizeOf(macho.load_command));
-        const main_cmd = try self.safeReadStruct(macho.entry_point_command);
-        std.debug.print("MAIN         Entry: {x: >10}\n", .{main_cmd.entryoff});
+        const entrypoint_cmd = try self.safeReadStruct(macho.entry_point_command);
+        self.odata.set_entrypoint_cmd(entrypoint_cmd);
     }
 
     fn safeReadStruct(self: MachOFile, comptime T: type) !T {

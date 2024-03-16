@@ -26,12 +26,14 @@ const SegmentCmd = struct {
 pub const OData = struct {
     header: macho.mach_header_64,
     segment_cmds: std.ArrayList(*SegmentCmd),
+    entrypoint_cmd: macho.entry_point_command,
 
     pub fn init() !*OData {
         var ptr = try gpa_alloc.create(OData);
         ptr.* = OData{
             .header = undefined,
             .segment_cmds = std.ArrayList(*SegmentCmd).init(gpa_alloc),
+            .entrypoint_cmd = undefined,
         };
 
         return ptr;
@@ -39,6 +41,10 @@ pub const OData = struct {
 
     pub fn set_header(self: *OData, header: macho.mach_header_64) void {
         self.header = header;
+    }
+
+    pub fn set_entrypoint_cmd(self: *OData, entrypoint_cmd: macho.entry_point_command) void {
+        self.entrypoint_cmd = entrypoint_cmd;
     }
 
     pub fn set_segment_cmd(

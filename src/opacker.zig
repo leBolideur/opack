@@ -10,15 +10,14 @@ pub const OPacker = struct {
     pub fn init(args: *std.process.ArgIteratorPosix) !OPacker {
         var ofile = try MachOFile.load(args);
         const odata = try ofile.parse();
-        ofile.close();
 
         for (odata.segment_cmds.items) |seg| {
             std.debug.print("segname: {s}\n", .{seg.segment_cmd.segname});
-            // std.debug.print("typeof sects: {?}\n", .{@TypeOf(seg.sections)});
             for (seg.sections.items) |sec| {
                 std.debug.print("\tsecname: {s}\n", .{sec.sectname});
             }
         }
+        std.debug.print("MAIN    Entry: {x: >10}\n", .{odata.entrypoint_cmd.entryoff});
 
         return OPacker{
             .odata = odata,
