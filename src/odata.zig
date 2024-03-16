@@ -5,9 +5,9 @@ const gpa_alloc = @import("gpa.zig").allocator;
 
 const SegmentCmd = struct {
     segment_cmd: macho.segment_command_64,
-    sections: *std.ArrayList(macho.section_64),
+    sections: std.ArrayList(macho.section_64),
 
-    pub fn init(segment_cmd: macho.segment_command_64, sections: *std.ArrayList(macho.section_64)) !*SegmentCmd {
+    pub fn init(segment_cmd: macho.segment_command_64, sections: std.ArrayList(macho.section_64)) !*SegmentCmd {
         var ptr = try gpa_alloc.create(SegmentCmd);
         ptr.* = SegmentCmd{
             .segment_cmd = segment_cmd,
@@ -18,6 +18,7 @@ const SegmentCmd = struct {
     }
 
     pub fn close(self: *const SegmentCmd) void {
+        self.sections.deinit();
         gpa_alloc.destroy(self);
     }
 };
@@ -43,7 +44,7 @@ pub const OData = struct {
     pub fn set_segment_cmd(
         self: *OData,
         seg_cmd: macho.segment_command_64,
-        sections: *std.ArrayList(macho.section_64),
+        sections: std.ArrayList(macho.section_64),
     ) !void {
         const seg_struct: *SegmentCmd = try SegmentCmd.init(seg_cmd, sections);
         try self.segment_cmds.append(seg_struct);

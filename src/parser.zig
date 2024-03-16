@@ -96,14 +96,14 @@ pub const MachOFile = struct {
         try self.file.seekBy(-@sizeOf(macho.load_command));
         const seg64_cmd = try self.safeReadStruct(macho.segment_command_64);
 
-        var sections = std.ArrayList(macho.section_64).init(gpa_alloc);
-        defer sections.deinit();
+        const sections = std.ArrayList(macho.section_64).init(gpa_alloc);
+        // defer sections.deinit();
 
         for (0..seg64_cmd.nsects) |_| {
             const sect = try self.dump_section();
             try sections.append(sect);
         }
-        try self.odata.set_segment_cmd(seg64_cmd, &sections);
+        try self.odata.set_segment_cmd(seg64_cmd, sections);
 
         std.debug.print("SEGMENT_64   SegName: {s: >20}\tNsects: {d}\tcmdsize: {d}\n", .{
             seg64_cmd.segname,
