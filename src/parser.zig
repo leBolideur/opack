@@ -2,7 +2,6 @@ const std = @import("std");
 const macho = std.macho;
 
 const OData = @import("odata.zig").OData;
-const gpa_alloc = @import("gpa.zig").allocator;
 
 const stdout = std.io.getStdOut().writer();
 const stderr = std.io.getStdErr().writer();
@@ -21,7 +20,7 @@ pub const MachOFile = struct {
 
     odata: *OData,
 
-    pub fn load(args: *std.process.ArgIteratorPosix) ParserError!MachOFile {
+    pub fn load(args: *std.process.ArgIteratorPosix, odata: *OData) ParserError!MachOFile {
         _ = args.skip();
         const filepath = args.next().?;
         const file = std.fs.cwd().openFile(filepath, .{}) catch |err| {
@@ -33,19 +32,17 @@ pub const MachOFile = struct {
             .filepath = filepath,
             .file = file,
             .reader = file.reader(),
-            .odata = try OData.init(),
+            .odata = odata,
         };
     }
 
-    pub fn parse(self: *MachOFile) ParserError!*OData {
+    pub fn parse(self: MachOFile) ParserError!void {
         const header = try self.dump_header();
         try self.list_load_commands(&header);
         self.file.close();
-
-        return self.odata;
     }
 
-    pub fn dump_header(self: *MachOFile) ParserError!macho.mach_header_64 {
+    pub fn dump_header(self: MachOFile) ParserError!macho.mach_header_64 {
         std.debug.print("Dumping header...\n", .{});
         const header = self.reader.readStruct(macho.mach_header_64) catch return ReadError.ReadHeader;
 
@@ -82,13 +79,12 @@ pub const MachOFile = struct {
         try self.file.seekBy(-@sizeOf(macho.load_command));
         const seg64_cmd = try self.safeReadStruct(macho.segment_command_64);
 
-        var sections = std.ArrayList(macho.section_64).init(gpa_alloc);
+        const segment_cmd = try self.odata.create_segment_cmd(seg64_cmd);
 
         for (0..seg64_cmd.nsects) |_| {
             const sect = try self.dump_section();
-            try sections.append(sect);
+            try segment_cmd.add_section(sect);
         }
-        try self.odata.set_segment_cmd(seg64_cmd, sections);
     }
 
     fn dump_section(self: MachOFile) !macho.section_64 {
