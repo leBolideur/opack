@@ -11,7 +11,7 @@ const SegmentCmd = struct {
         segment_cmd: macho.segment_command_64,
         gpa_alloc: *const std.mem.Allocator,
     ) !*SegmentCmd {
-        var ptr = try gpa_alloc.create(SegmentCmd);
+        const ptr = try gpa_alloc.create(SegmentCmd);
         ptr.* = SegmentCmd{
             .segment_cmd = segment_cmd,
             .sections = null,
@@ -42,7 +42,7 @@ pub const OData = struct {
     gpa_alloc: *const std.mem.Allocator,
 
     pub fn init(gpa_alloc: *std.mem.Allocator) !*OData {
-        var ptr = try gpa_alloc.create(OData);
+        const ptr = try gpa_alloc.create(OData);
 
         ptr.* = OData{
             .header = undefined,
