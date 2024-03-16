@@ -22,15 +22,7 @@ pub const MachOFile = struct {
     odata: *OData,
 
     pub fn close(self: *MachOFile) void {
-        for (self.odata.segment_cmds.items) |seg| {
-            std.debug.print("segname: {s}\n", .{seg.segment_cmd.segname});
-            std.debug.print("typeof sects: {?}\n", .{@TypeOf(seg.sections)});
-            for (seg.sections.items) |sec| {
-                std.debug.print("\tsecname: {s}\n", .{sec.sectname});
-            }
-        }
         self.file.close();
-        self.odata.close();
         gpa_alloc.destroy(self);
     }
 
@@ -54,9 +46,11 @@ pub const MachOFile = struct {
         return ptr;
     }
 
-    pub fn parse(self: *MachOFile) ParserError!void {
+    pub fn parse(self: *MachOFile) ParserError!*OData {
         const header = try self.dump_header();
         try self.list_load_commands(&header);
+
+        return self.odata;
     }
 
     pub fn dump_header(self: *MachOFile) ParserError!macho.mach_header_64 {
@@ -96,23 +90,13 @@ pub const MachOFile = struct {
         try self.file.seekBy(-@sizeOf(macho.load_command));
         const seg64_cmd = try self.safeReadStruct(macho.segment_command_64);
 
-        const sections = std.ArrayList(macho.section_64).init(gpa_alloc);
-        // defer sections.deinit();
+        var sections = std.ArrayList(macho.section_64).init(gpa_alloc);
 
         for (0..seg64_cmd.nsects) |_| {
             const sect = try self.dump_section();
             try sections.append(sect);
         }
         try self.odata.set_segment_cmd(seg64_cmd, sections);
-
-        std.debug.print("SEGMENT_64   SegName: {s: >20}\tNsects: {d}\tcmdsize: {d}\n", .{
-            seg64_cmd.segname,
-            seg64_cmd.nsects,
-            seg64_cmd.cmdsize,
-        });
-        // for (sections.items) |sec| {
-        //     std.debug.print("\tSecName: {s}\n", .{sec.sectname});
-        // }
     }
 
     fn dump_section(self: MachOFile) !macho.section_64 {

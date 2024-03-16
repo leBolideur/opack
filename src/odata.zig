@@ -48,15 +48,10 @@ pub const OData = struct {
     ) !void {
         const seg_struct: *SegmentCmd = try SegmentCmd.init(seg_cmd, sections);
         try self.segment_cmds.append(seg_struct);
-
-        // for (seg_struct.sections.items) |sec| {
-        //     std.debug.print("\tsecname: {s}\n", .{sec.sectname});
-        // }
     }
 
     pub fn close(self: *OData) void {
         for (self.segment_cmds.items) |item| {
-            // std.debug.print("typeof item  {?}\n", .{@TypeOf(item)});
             item.close();
         }
 

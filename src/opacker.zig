@@ -1,25 +1,31 @@
 const std = @import("std");
 
 const MachOFile = @import("parser.zig").MachOFile;
+const OData = @import("odata.zig").OData;
 const gpa_alloc = @import("gpa.zig").allocator;
 
 pub const OPacker = struct {
-    ofile: *MachOFile,
+    odata: *OData,
 
-    pub fn init(args: *std.process.ArgIteratorPosix) !*OPacker {
+    pub fn init(args: *std.process.ArgIteratorPosix) !OPacker {
         var ofile = try MachOFile.load(args);
-        try ofile.parse();
+        const odata = try ofile.parse();
+        ofile.close();
 
-        var ptr = try gpa_alloc.create(OPacker);
-        ptr.* = OPacker{
-            .ofile = ofile,
+        for (odata.segment_cmds.items) |seg| {
+            std.debug.print("segname: {s}\n", .{seg.segment_cmd.segname});
+            // std.debug.print("typeof sects: {?}\n", .{@TypeOf(seg.sections)});
+            for (seg.sections.items) |sec| {
+                std.debug.print("\tsecname: {s}\n", .{sec.sectname});
+            }
+        }
+
+        return OPacker{
+            .odata = odata,
         };
-
-        return ptr;
     }
 
     pub fn close(self: *OPacker) void {
-        self.ofile.close();
-        gpa_alloc.destroy(self);
+        self.odata.close();
     }
 };

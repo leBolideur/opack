@@ -6,6 +6,7 @@ const OPacker = @import("opacker.zig").OPacker;
 const gpa = @import("gpa.zig");
 
 pub fn main() !void {
+    defer _ = gpa.gpa.deinit();
     const stdout = std.io.getStdOut().writer();
     var args = std.process.args().inner;
 
@@ -16,7 +17,6 @@ pub fn main() !void {
 
     var opacker = try OPacker.init(&args);
 
-    defer _ = gpa.gpa.deinit();
     defer opacker.close();
 }
 
