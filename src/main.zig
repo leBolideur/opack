@@ -14,27 +14,10 @@ pub fn main() !void {
         return;
     }
 
-    // var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    // defer _ = gpa.deinit();
-    // const allocator = gpa.allocator();
+    var opacker = try OPacker.init(&args);
 
-    // const opacker = OPacker{};
-    const opacker = try OPacker.init(&args);
+    defer _ = gpa.gpa.deinit();
     defer opacker.close();
-
-    // const oFile = parser.MachOFile.load(&args, allocator) catch return;
-    // defer allocator.free(oFile);
-
-    // const oData = oFile.parse();
-    // defer allocator.free(oData);
-
-    // defer oFile.close();
-
-    // oFile.dump_header() catch return;
-    // try oFile.list_load_commands();
-    //
-
-    _ = gpa.gpa.deinit();
 }
 
 test "simple test" {}

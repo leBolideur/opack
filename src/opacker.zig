@@ -1,20 +1,25 @@
 const std = @import("std");
+
 const MachOFile = @import("parser.zig").MachOFile;
+const gpa_alloc = @import("gpa.zig").allocator;
 
 pub const OPacker = struct {
-    ofile: MachOFile,
+    ofile: *MachOFile,
 
-    pub fn init(args: *std.process.ArgIteratorPosix) !OPacker {
+    pub fn init(args: *std.process.ArgIteratorPosix) !*OPacker {
         var ofile = try MachOFile.load(args);
         try ofile.parse();
-        try ofile.list_load_commands();
 
-        return OPacker{
+        var ptr = try gpa_alloc.create(OPacker);
+        ptr.* = OPacker{
             .ofile = ofile,
         };
+
+        return ptr;
     }
 
-    pub fn close(self: OPacker) void {
+    pub fn close(self: *OPacker) void {
         self.ofile.close();
+        gpa_alloc.destroy(self);
     }
 };
