@@ -1,15 +1,6 @@
 const std = @import("std");
 const OData = @import("odata.zig").OData;
 
-fn sliceUntilZero(arr: [16]u8) []const u8 {
-    for (arr, 0..) |byte, index| {
-        if (byte == 0) {
-            return arr[0..index];
-        }
-    }
-    return arr[0..];
-}
-
 fn format_prot(prot: std.macho.vm_prot_t) [3]u8 {
     const PROT = std.macho.PROT;
     var buffer = [3]u8{ '-', '-', '-' };
@@ -28,11 +19,13 @@ fn format_prot(prot: std.macho.vm_prot_t) [3]u8 {
 }
 
 pub fn print_test(odata: *OData) void {
-    for (odata.segment_cmds.items) |seg| {
-        std.debug.print("{s:<18}fileoff: {d:<7}vmaddr: 0x0{x:<15}maxprot: {s:<8}initprot: {s}\n", .{
-            sliceUntilZero(seg.segment_cmd.segname),
+    for (odata.load_cmds.items) |seg| {
+        std.debug.print("{s:<18}fileoff: {d:<7}vmaddr: 0x0{x:<12}vmsize: 0x{x:<12}vmsize: {x:<12}maxprot: {s:<7}initprot: {s}\n", .{
+            seg.segname,
             seg.segment_cmd.fileoff,
             seg.segment_cmd.vmaddr,
+            seg.segment_cmd.vmsize,
+            seg.vmem_size(),
             format_prot(seg.segment_cmd.maxprot),
             format_prot(seg.segment_cmd.initprot),
         });

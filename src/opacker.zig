@@ -24,6 +24,23 @@ pub const OPacker = struct {
         try ofile.parse();
 
         printer.print_test(odata_ptr);
+        const macho = std.macho;
+        const prot = macho.PROT.WRITE & macho.PROT.EXEC;
+        const text_lcmd = odata_ptr.get_textseg_cmd();
+        if (text_lcmd == null) {
+            std.debug.print("no __TEXT segment load cmd!\n", .{});
+            return;
+        }
+        std.debug.print("cmd size: {?}\n", .{(text_lcmd.?.vmsize)});
+        const page_ptr = try std.os.mmap(
+            null, // std.mem.asBytes(text_lcmd.?.vmaddr),
+            @as(usize, text_lcmd.?.vmsize),
+            prot,
+            std.os.MAP.ANONYMOUS | std.os.MAP.PRIVATE,
+            -1,
+            0,
+        );
+        defer std.os.munmap(page_ptr);
 
         // return OPacker{
         //     .odata = odata_ptr,
