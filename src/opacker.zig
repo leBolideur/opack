@@ -45,28 +45,39 @@ pub const OPacker = struct {
             return;
         }
 
-        std.debug.print("sect addr >> {x}\n", .{(sect.?.addr)});
-        std.debug.print("sect offset >> {d}\traw size: {d}\n", .{ sect.?.offset, stats.size });
-        std.debug.print("sect size >> {d}\n", .{(sect.?.size)});
+        // std.debug.print("sect addr >> {x}\n", .{(sect.?.addr)});
+        // std.debug.print("sect offset >> {d}\traw size: {d}\n", .{ sect.?.offset, stats.size });
+        // std.debug.print("sect size >> {d}\n", .{(sect.?.size)});
 
-        const fileoff = sect.?.offset;
-        const size = sect.?.size;
-        const sect_data = raw_slice[fileoff..(fileoff + size)];
+        // const fileoff = sect.?.offset;
+        // const size = sect.?.size;
+        // const sect_data = raw_slice[fileoff..(fileoff + size)];
 
         // try omap.debug_disas(sect_data);
 
         std.debug.print("\nExecuting...\n\n", .{});
-        std.debug.print(" sect_data @ {*:<15}\n", .{(sect_data)});
+        // std.debug.print(" sect_data @ {*:<15}\n", .{(sect_data)});
 
-        const region_slice = OMap.get_region_slice(sect_data.ptr);
-
-        // try pause();
         const macho = std.macho;
         const prot = macho.PROT.READ | macho.PROT.WRITE; // | macho.PROT.EXEC;
-        std.os.mprotect(region_slice, prot) catch |err| {
-            std.debug.print("mprotect err >>> {!}\n", .{err});
+        const reajust_prot = macho.PROT.READ | macho.PROT.EXEC;
+
+        const flags = std.os.MAP.ANONYMOUS | std.os.MAP.PRIVATE;
+        const full_prot = std.os.mmap(null, 4096, prot, flags, -1, 0) catch |err| {
+            std.debug.print("mmap full err >>> {!}\n", .{err});
+            return;
         };
-        // try pause();
+        defer std.os.munmap(full_prot);
+        std.debug.print(" full_prot @ {*:<15}\n", .{full_prot.ptr});
+
+        try pause();
+        const region = OMap.get_region_slice(full_prot.ptr);
+        std.debug.print("region_ptr @ {*:<15}\n", .{region.ptr});
+        std.debug.print("region_len @ {d:<15}\n", .{region.len});
+        std.os.mprotect(region, reajust_prot) catch |err| {
+            std.debug.print("mprotect full err >>> {!}\n", .{err});
+        };
+        try pause();
 
         // std.debug.print("\nJumping @ 0x{*}...\n", .{sect_data});
         // const jmp: *const fn () void = @ptrCast(region_slice.ptr);
