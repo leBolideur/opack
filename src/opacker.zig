@@ -10,6 +10,9 @@ const MapRequest = omap_import.MapRequest;
 
 const GPAConfig = .{ .verbose_log = false };
 
+const MemoryError = error{MmapFailed};
+const PackerError = anyerror || MemoryError;
+
 pub const OPacker = struct {
     pub fn init(args: *std.process.ArgIteratorPosix) !void {
         var gpa = std.heap.GeneralPurposeAllocator(GPAConfig){};
@@ -33,27 +36,28 @@ pub const OPacker = struct {
 
         printer.print_debug(odata_ptr);
 
-        const sect = odata_ptr.get_text_sect();
-        if (sect == null) {
+        // ---------- init end -----------
+
+        const sect = try odata_ptr.get_text_sect() orelse {
             std.debug.print("no __text section!\n", .{});
             return;
-        }
+        };
 
         std.debug.print("\nMapping...\n\n", .{});
 
-        const request = MapRequest.ask(4096);
-        if (request == null) {
+        const request = try MapRequest.ask(4096) orelse {
             std.debug.print("Response: nop!\n", .{});
-        }
-        defer request.?.close();
+            return PackerError.MmapFailed;
+        };
+        defer request.close();
 
-        const fileoff = sect.?.offset;
-        const size = sect.?.size;
+        const fileoff = sect.offset;
+        const size = sect.size;
         const sect_data = raw_slice[fileoff..(fileoff + size)];
 
-        const region = request.?.region;
-        request.?.write(u8, sect_data);
-        request.?.mprotect(std.macho.PROT.READ | std.macho.PROT.EXEC);
+        const region = request.region;
+        request.write(u8, sect_data);
+        request.mprotect(std.macho.PROT.READ | std.macho.PROT.EXEC);
 
         std.debug.print("\nJumping @ 0x{*}...\n", .{region.ptr});
         const jmp: *const fn () void = @ptrCast(region.ptr);

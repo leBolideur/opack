@@ -1,6 +1,10 @@
 const std = @import("std");
 const macho = std.macho;
 
+const LoadSegmentCmdError = error{NoText_Section};
+const ODataError_ = error{ AllocatorCreate, CreateSegmentCmd, NoText_Segment };
+const ODataError = anyerror || LoadSegmentCmdError || ODataError_;
+
 const LoadSegmentCmd = struct {
     segment_cmd: macho.segment_command_64,
     sections: ?std.ArrayList(macho.section_64),
@@ -39,7 +43,7 @@ const LoadSegmentCmd = struct {
         return self.segment_cmd.vmaddr + self.segment_cmd.vmsize;
     }
 
-    pub fn get_text_sect(self: *LoadSegmentCmd) ?macho.section_64 {
+    pub fn get_text_sect(self: *LoadSegmentCmd) ODataError!?macho.section_64 {
         for (self.sections.?.items) |sect| {
             const sectname = LoadSegmentCmd.sliceUntilZero(&sect.sectname);
             if (std.mem.eql(u8, sectname, "__text")) {
@@ -47,7 +51,7 @@ const LoadSegmentCmd = struct {
             }
         }
 
-        return null;
+        return LoadSegmentCmdError.NoText_Section;
     }
 
     pub fn close(self: *const LoadSegmentCmd) void {
@@ -74,7 +78,7 @@ pub const OData = struct {
     gpa_alloc: *const std.mem.Allocator,
 
     pub fn init(gpa_alloc: *std.mem.Allocator) !*OData {
-        const ptr = try gpa_alloc.create(OData);
+        const ptr = gpa_alloc.create(OData) catch return ODataError.AllocatorCreateError;
 
         ptr.* = OData{
             .header = undefined,
@@ -113,7 +117,7 @@ pub const OData = struct {
         return null;
     }
 
-    pub fn get_text_sect(self: *OData) ?macho.section_64 {
+    pub fn get_text_sect(self: *OData) ODataError!?macho.section_64 {
         for (self.load_cmds.items) |cmd| {
             if (std.mem.eql(u8, cmd.segname, "__TEXT")) {
                 const sect = cmd.get_text_sect();
@@ -121,7 +125,7 @@ pub const OData = struct {
             }
         }
 
-        return null;
+        return ODataError_.NoText_Segment;
     }
 
     pub fn close(self: *OData) void {

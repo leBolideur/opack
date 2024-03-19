@@ -6,6 +6,9 @@ const OData = @import("odata.zig").OData;
 
 const page_size: usize = 0x4000; // TODO: Find a way to get system page_size
 
+const MapRequestError = error{MmapFailed};
+const MapperError = anyerror || MapRequestError;
+
 pub const OMap = struct {
     ofile: *const OFile,
     odata: *OData,
@@ -66,12 +69,12 @@ pub const MapRequest = struct {
     map_size: usize,
     region: []align(page_size) u8,
 
-    pub fn ask(size: usize) ?MapRequest {
+    pub fn ask(size: usize) MapRequestError!?MapRequest {
         const prot = macho.PROT.READ | macho.PROT.WRITE;
         const flags = std.os.MAP.ANONYMOUS | std.os.MAP.PRIVATE;
         const anon_map = std.os.mmap(null, size, prot, flags, -1, 0) catch |err| {
             std.debug.print("mmap err >>> {!}\n", .{err});
-            return null;
+            return MapRequestError.MmapFailed;
         };
 
         const region_slice = MapRequest.get_region_slice(anon_map.ptr);
@@ -91,7 +94,7 @@ pub const MapRequest = struct {
 
     pub fn mprotect(self: MapRequest, prot: u32) void {
         std.os.mprotect(self.region, prot) catch |err| {
-            std.debug.print("mprotect full err >>> {!}\n", .{err});
+            std.debug.print("mprotect err >>> {!}\n", .{err});
         };
     }
 
