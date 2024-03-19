@@ -49,39 +49,40 @@ pub const OPacker = struct {
         // std.debug.print("sect offset >> {d}\traw size: {d}\n", .{ sect.?.offset, stats.size });
         // std.debug.print("sect size >> {d}\n", .{(sect.?.size)});
 
-        // const fileoff = sect.?.offset;
-        // const size = sect.?.size;
-        // const sect_data = raw_slice[fileoff..(fileoff + size)];
-
         // try omap.debug_disas(sect_data);
 
         std.debug.print("\nExecuting...\n\n", .{});
         // std.debug.print(" sect_data @ {*:<15}\n", .{(sect_data)});
 
         const macho = std.macho;
-        const prot = macho.PROT.READ | macho.PROT.WRITE; // | macho.PROT.EXEC;
+        const prot = macho.PROT.READ | macho.PROT.WRITE;
         const reajust_prot = macho.PROT.READ | macho.PROT.EXEC;
 
         const flags = std.os.MAP.ANONYMOUS | std.os.MAP.PRIVATE;
-        const full_prot = std.os.mmap(null, 4096, prot, flags, -1, 0) catch |err| {
+        const map_size: usize = 4096;
+        const map = std.os.mmap(null, map_size, prot, flags, -1, 0) catch |err| {
             std.debug.print("mmap full err >>> {!}\n", .{err});
             return;
         };
-        defer std.os.munmap(full_prot);
-        std.debug.print(" full_prot @ {*:<15}\n", .{full_prot.ptr});
+        defer std.os.munmap(map);
 
-        try pause();
-        const region = OMap.get_region_slice(full_prot.ptr);
+        const fileoff = sect.?.offset;
+        const size = sect.?.size;
+        const sect_data = raw_slice[fileoff..(fileoff + size)];
+
+        const region = OMap.get_region_slice(map.ptr);
+        const dest: []u8 = map[0..map_size];
+        std.mem.copy(u8, dest, sect_data);
+
         std.debug.print("region_ptr @ {*:<15}\n", .{region.ptr});
         std.debug.print("region_len @ {d:<15}\n", .{region.len});
         std.os.mprotect(region, reajust_prot) catch |err| {
             std.debug.print("mprotect full err >>> {!}\n", .{err});
         };
-        try pause();
 
-        // std.debug.print("\nJumping @ 0x{*}...\n", .{sect_data});
-        // const jmp: *const fn () void = @ptrCast(region_slice.ptr);
-        // jmp();
+        std.debug.print("\nJumping @ 0x{*}...\n", .{region.ptr});
+        const jmp: *const fn () void = @ptrCast(region.ptr);
+        jmp();
 
         std.debug.print("\nSo far, so good...\n", .{});
 
