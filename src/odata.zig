@@ -42,9 +42,7 @@ const LoadSegmentCmd = struct {
     pub fn get_text_sect(self: *LoadSegmentCmd) ?macho.section_64 {
         for (self.sections.?.items) |sect| {
             const sectname = LoadSegmentCmd.sliceUntilZero(&sect.sectname);
-            // std.debug.print("sectname: {s}\n", .{sectname});
             if (std.mem.eql(u8, sectname, "__text")) {
-                std.debug.print("typeof sect: {?}\n", .{@TypeOf(sect)});
                 return sect;
             }
         }

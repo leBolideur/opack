@@ -18,7 +18,7 @@ fn format_prot(prot: std.macho.vm_prot_t) [3]u8 {
     return buffer;
 }
 
-pub fn print_test(odata: *OData) void {
+pub fn print_debug(odata: *OData) void {
     for (odata.load_cmds.items) |seg| {
         std.debug.print("{s:<15}fileoff: {x:<7}filesize: {d:<7}vmemrange: {x:0<9}..{x:<12}vmsize: {x:<12}maxprot: {s:<7}initprot: {s}\n", .{
             seg.segname,
