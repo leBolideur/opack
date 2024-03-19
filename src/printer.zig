@@ -20,20 +20,21 @@ fn format_prot(prot: std.macho.vm_prot_t) [3]u8 {
 
 pub fn print_test(odata: *OData) void {
     for (odata.load_cmds.items) |seg| {
-        std.debug.print("{s:<18}fileoff: {d:<7}vmaddr: 0x0{x:<12}vmsize: 0x{x:<12}vmsize: {x:<12}maxprot: {s:<7}initprot: {s}\n", .{
+        std.debug.print("{s:<15}fileoff: {x:<7}filesize: {d:<7}vmemrange: {x:0<9}..{x:<12}vmsize: {x:<12}maxprot: {s:<7}initprot: {s}\n", .{
             seg.segname,
             seg.segment_cmd.fileoff,
+            seg.segment_cmd.filesize,
             seg.segment_cmd.vmaddr,
-            seg.segment_cmd.vmsize,
             seg.vmem_size(),
+            seg.segment_cmd.vmsize,
             format_prot(seg.segment_cmd.maxprot),
             format_prot(seg.segment_cmd.initprot),
         });
-        if (seg.sections) |sections| {
-            for (sections.items) |sec| {
-                std.debug.print("    secname: {s:>16}\n", .{sec.sectname});
-            }
-        }
+        // if (seg.sections) |sections| {
+        //     for (sections.items) |sec| {
+        //         std.debug.print("    secname: {s:>16}\n", .{sec.sectname});
+        //     }
+        // }
     }
     std.debug.print("MAIN Entry: {x:>10}\n", .{odata.entrypoint_cmd.entryoff});
 }

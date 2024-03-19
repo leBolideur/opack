@@ -39,6 +39,19 @@ const LoadSegmentCmd = struct {
         return self.segment_cmd.vmaddr + self.segment_cmd.vmsize;
     }
 
+    pub fn get_text_sect(self: *LoadSegmentCmd) ?macho.section_64 {
+        for (self.sections.?.items) |sect| {
+            const sectname = LoadSegmentCmd.sliceUntilZero(&sect.sectname);
+            // std.debug.print("sectname: {s}\n", .{sectname});
+            if (std.mem.eql(u8, sectname, "__text")) {
+                std.debug.print("typeof sect: {?}\n", .{@TypeOf(sect)});
+                return sect;
+            }
+        }
+
+        return null;
+    }
+
     pub fn close(self: *const LoadSegmentCmd) void {
         if (self.sections) |sections| sections.deinit();
         self.gpa_alloc.free(self.segname);
@@ -96,6 +109,17 @@ pub const OData = struct {
         for (self.load_cmds.items) |cmd| {
             if (std.mem.eql(u8, cmd.segname, "__TEXT")) {
                 return &cmd.segment_cmd;
+            }
+        }
+
+        return null;
+    }
+
+    pub fn get_text_sect(self: *OData) ?macho.section_64 {
+        for (self.load_cmds.items) |cmd| {
+            if (std.mem.eql(u8, cmd.segname, "__TEXT")) {
+                const sect = cmd.get_text_sect();
+                return sect;
             }
         }
 

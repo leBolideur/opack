@@ -39,11 +39,18 @@ pub const MachOFile = struct {
     pub fn parse(self: MachOFile) ParserError!void {
         const header = try self.dump_header();
         try self.list_load_commands(&header);
-        self.file.close();
+        // self.file.close();
+    }
+
+    pub fn dump_all_raw(self: MachOFile, buffer: []u8) !void {
+        try self.file.seekTo(0);
+        _ = try self.reader.readAll(buffer);
+        // std.debug.print("All readed: {d}\n", .{bytes_readed});
+        try self.file.seekTo(0);
     }
 
     pub fn dump_header(self: MachOFile) ParserError!macho.mach_header_64 {
-        std.debug.print("Dumping header...\n", .{});
+        // std.debug.print("Dumping header...\n", .{});
         const header = self.reader.readStruct(macho.mach_header_64) catch return ReadError.ReadHeader;
 
         if (header.magic != macho.MH_MAGIC_64) {
@@ -63,7 +70,7 @@ pub const MachOFile = struct {
     }
 
     pub fn list_load_commands(self: MachOFile, header: *const macho.mach_header_64) ParserError!void {
-        try stdout.print("{d} load commands found\n\n", .{header.ncmds});
+        // try stdout.print("{d} load commands found\n\n", .{header.ncmds});
 
         for (0..header.ncmds) |_| {
             const lcmd = self.reader.readStruct(macho.load_command) catch return ReadError.ReadLoadCommand;
@@ -98,6 +105,15 @@ pub const MachOFile = struct {
         self.odata.set_entrypoint_cmd(entrypoint_cmd);
     }
 
+    // Use to pick data form file and restore reader
+    pub fn pick(self: MachOFile, offset: u64, size: u64, buffer: *[]u8) !void {
+        const seek_pos_bck = try self.file.getPos();
+        try self.file.seekTo(offset);
+        const size_read = try self.reader.read(buffer.*);
+        std.debug.print("wanted: {d}\treaded: {d}\n", .{ size, size_read });
+        try self.file.seekTo(seek_pos_bck);
+    }
+
     fn safeReadStruct(self: MachOFile, comptime T: type) !T {
         const start_cursor = try self.file.getPos();
         const struct_readed = self.reader.readStruct(T) catch return ReadError.ReadLoadCommand;
@@ -119,5 +135,9 @@ pub const MachOFile = struct {
             });
             return ParserError.SegCmdBoundary;
         }
+    }
+
+    pub fn close(self: MachOFile) void {
+        self.file.close();
     }
 };
