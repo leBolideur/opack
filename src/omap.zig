@@ -32,14 +32,18 @@ pub const OMap = struct {
 
     pub fn map(self: OMap) void {
         _ = self;
-        // const sect = self.odata.get_text_sect();
-        // if (sect == null) {
-        //     std.debug.print("no __text section!\n", .{});
-        //     return;
-        // }
     }
 
-    pub fn debug_disas(self: OMap, data: []u8) !void {
+    pub fn write_section_data(self: OMap, request: *const MapRequest, data_section: macho.section_64, raw_slice: []u8) void {
+        _ = self;
+        const data_fileoff = data_section.offset;
+        const data_size = data_section.size;
+        const data_sect_raw = raw_slice[data_fileoff..(data_fileoff + data_size)];
+
+        request.write(u8, data_sect_raw);
+    }
+
+    pub fn debug_disas(self: OMap, data: []u8, offset: ?u64) !void {
         // TODO: pipe stream
         std.debug.print("\nDisassembling {s}...\n", .{self.ofile.filepath});
         var tmp_file = try std.fs.cwd().createFile(".bin", .{ .truncate = true });
@@ -48,7 +52,8 @@ pub const OMap = struct {
 
         const size_u64 = comptime @sizeOf(u64);
         var buf: [size_u64]u8 = undefined;
-        const entry_offset = try std.fmt.bufPrint(buf[0..], "{}", .{self.odata.entrypoint_cmd.entryoff});
+        const offset_ = offset orelse 0;
+        const entry_offset = try std.fmt.bufPrint(buf[0..], "{}", .{offset_});
 
         const argv = [_][]const u8{ "radare2", "-b", "64", "-m", entry_offset, "-qc", "\"pd 10\"", ".bin" };
         var proc = try std.ChildProcess.exec(.{
@@ -67,54 +72,32 @@ pub const OMap = struct {
 pub const MapRequest = struct {
     map: []align(page_size) u8,
     map_size: usize,
-    region: []align(page_size) u8,
+    region: ?[]align(page_size) u8,
 
-    pub fn ask(addr: ?u64, size: usize) MapRequestError!?MapRequest {
+    pub fn ask(addr: ?usize, size: usize) MapRequestError!?MapRequest {
         const prot = macho.PROT.READ | macho.PROT.WRITE;
 
         // TODO: Ugly as hell... (to avoid comptime related error)
         var flags: u32 = @as(u32, std.os.MAP.ANONYMOUS) | @as(u32, std.os.MAP.PRIVATE);
+
+        // FIXME: Allow FIXED
         // if (addr != null) flags |= @as(u32, std.os.MAP.FIXED);
 
-        {
-            // ----- test zone ------
-            // flags = @as(u32, std.os.MAP.ANONYMOUS) | @as(u32, std.os.MAP.PRIVATE);
-            // var addr_request = undefined;
-            // if (addr != null) {
-            //     const int = addr.? & ~(page_size - 1);
-            //     addr_request = @as([*]align(page_size) u8, @ptrFromInt(int));
-            // } else addr_request = null;
-            // -----    end    -------
-            //
-        }
-        std.debug.print("\taddr: {x}\n", .{addr.?});
-        // const addr_request = if (addr != null) @as([*]align(page_size) u8, @ptrFromInt(addr.?)) else null;
-        // std.debug.print("\taddr: {x}\trequested addr: {*}\n", .{ addr.?, addr_request });
-
+        // const addr_ptr: [*]u8 = @ptrFromInt(addr.?);
+        // const aligned: [*]align(page_size) u8 = MapRequest.get_region_slice(addr_ptr);
+        // // std.debug.print("\taligned: {*}\n", .{aligned.ptr});
+        // const req = if (addr != null) aligned.ptr else null;
+        _ = addr;
         const anon_map = std.os.mmap(null, size, prot, flags, -1, 0) catch |err| {
             std.debug.print("mmap err >>> {!}\n", .{err});
             return MapRequestError.MmapFailed;
         };
 
-        const region_slice = MapRequest.get_region_slice(anon_map.ptr);
-
         return MapRequest{
             .map = anon_map,
             .map_size = size,
-            .region = region_slice,
+            .region = null,
         };
-    }
-
-    fn _region(addr_ptr: usize) []align(page_size) u8 {
-        // const ptr_to_int = @intFromPtr(addr_ptr);
-        var region: usize = addr_ptr & ~(page_size - 1);
-        var region_ptr: [*]align(page_size) u8 = @ptrFromInt(region);
-        const region_slice = region_ptr[0..page_size];
-
-        std.debug.print("region_ptr @ {*:<15}\n", .{region_ptr});
-        std.debug.print("region_len @ {d:<15}\n", .{region_slice.len});
-
-        return region_slice;
     }
 
     pub fn write(self: MapRequest, comptime T: type, data: []T) void {
@@ -124,8 +107,12 @@ pub const MapRequest = struct {
         std.mem.copy(T, dest, sect_data);
     }
 
-    pub fn mprotect(self: MapRequest, prot: u32) void {
-        std.os.mprotect(self.region, prot) catch |err| {
+    pub fn mprotect(self: *MapRequest, prot: u32) void {
+        if (self.region == null) {
+            self.region = MapRequest.get_region_slice(self.map.ptr);
+        }
+        std.debug.print("  mprotect @ {*}...\n", .{self.region.?});
+        std.os.mprotect(self.region.?, prot) catch |err| {
             std.debug.print("mprotect err >>> {!}\n", .{err});
         };
     }
