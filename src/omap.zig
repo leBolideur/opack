@@ -35,11 +35,10 @@ pub const OMap = struct {
     }
 
     pub fn map(self: *OMap, raw_slice: []u8) !*const fn () void {
-        var jmp: *const fn () void = undefined; // = @ptrCast(text_region.region.?);
+        var jmp: *const fn () void = undefined;
         std.debug.print("\nMapping...\n", .{});
 
         for (self.odata.load_cmds.items) |seg| {
-            // std.debug.print("\ntypeof seg_type {?}\tvalue: {?}\n", .{ @TypeOf(seg.type), seg.type });
             const seg_type = seg.type orelse break;
             const section_ = switch (seg_type) {
                 SegmentType.DATA => try seg.get_data_sect(),
@@ -53,7 +52,6 @@ pub const OMap = struct {
                 return MapRequestError.MmapFailed;
             };
             try self.mappings.append(response);
-            // defer text_region.close();
 
             self.write_section_data(&response, section, raw_slice);
             response.mprotect(std.macho.PROT.READ | std.macho.PROT.EXEC);

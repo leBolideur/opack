@@ -42,7 +42,6 @@ const LoadSegmentCmd = struct {
     }
 
     fn get_type_by_name(segname_ptr: []u8) SegmentType {
-        std.debug.print("get_type_by_name: {s}\n", .{segname_ptr});
         if (std.mem.eql(u8, segname_ptr, "__TEXT")) {
             return SegmentType.TEXT;
         } else if (std.mem.eql(u8, segname_ptr, "__DATA")) {
