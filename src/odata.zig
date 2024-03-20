@@ -10,10 +10,13 @@ const ODataError_ = error{
 };
 const ODataError = anyerror || LoadSegmentCmdError || ODataError_;
 
+pub const SegmentType = enum { DATA, TEXT, Unknown };
+
 const LoadSegmentCmd = struct {
     segment_cmd: macho.segment_command_64,
     sections: ?std.ArrayList(macho.section_64),
     segname: []u8,
+    type: ?SegmentType,
 
     gpa_alloc: *const std.mem.Allocator,
 
@@ -31,10 +34,21 @@ const LoadSegmentCmd = struct {
             .segment_cmd = segment_cmd,
             .sections = null,
             .segname = segname_ptr,
+            .type = @This().get_type_by_name(segname_ptr),
             .gpa_alloc = gpa_alloc,
         };
 
         return ptr;
+    }
+
+    fn get_type_by_name(segname_ptr: []u8) SegmentType {
+        std.debug.print("get_type_by_name: {s}\n", .{segname_ptr});
+        if (std.mem.eql(u8, segname_ptr, "__TEXT")) {
+            return SegmentType.TEXT;
+        } else if (std.mem.eql(u8, segname_ptr, "__DATA")) {
+            return SegmentType.DATA;
+        }
+        return SegmentType.Unknown;
     }
 
     pub fn add_section(self: *LoadSegmentCmd, section: macho.section_64) !void {

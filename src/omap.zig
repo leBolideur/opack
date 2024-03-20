@@ -2,7 +2,9 @@ const std = @import("std");
 const macho = std.macho;
 
 const OFile = @import("parser.zig").MachOFile;
-const OData = @import("odata.zig").OData;
+const odata_import = @import("odata.zig");
+const OData = odata_import.OData;
+const SegmentType = odata_import.SegmentType;
 
 const page_size: usize = 0x4000; // TODO: Find a way to get system page_size
 
@@ -13,6 +15,7 @@ pub const OMap = struct {
     ofile: *const OFile,
     odata: *OData,
     raw_file: []u8,
+    mappings: std.ArrayList(MapRequest),
 
     allocator: *std.mem.Allocator,
 
@@ -26,12 +29,42 @@ pub const OMap = struct {
             .ofile = ofile,
             .odata = odata,
             .raw_file = raw_file,
+            .mappings = std.ArrayList(MapRequest).init(allocator.*),
             .allocator = allocator,
         };
     }
 
-    pub fn map(self: OMap) void {
-        _ = self;
+    pub fn map(self: *OMap, raw_slice: []u8) !*const fn () void {
+        var jmp: *const fn () void = undefined; // = @ptrCast(text_region.region.?);
+        std.debug.print("\nMapping...\n", .{});
+
+        for (self.odata.load_cmds.items) |seg| {
+            // std.debug.print("\ntypeof seg_type {?}\tvalue: {?}\n", .{ @TypeOf(seg.type), seg.type });
+            const seg_type = seg.type orelse break;
+            const section_ = switch (seg_type) {
+                SegmentType.DATA => try seg.get_data_sect(),
+                SegmentType.TEXT => try seg.get_text_sect(),
+                SegmentType.Unknown => continue,
+            };
+
+            const section = section_.?;
+            var response = try MapRequest.ask(null, section.size) orelse {
+                std.debug.print("Response text_map: nop!\n", .{});
+                return MapRequestError.MmapFailed;
+            };
+            try self.mappings.append(response);
+            // defer text_region.close();
+
+            self.write_section_data(&response, section, raw_slice);
+            response.mprotect(std.macho.PROT.READ | std.macho.PROT.EXEC);
+
+            if (seg_type == SegmentType.TEXT) {
+                std.debug.print("\nJumping @ 0x{*}...\n", .{response.region.?});
+                jmp = @ptrCast(response.region.?);
+            }
+        }
+
+        return jmp;
     }
 
     pub fn write_section_data(self: OMap, request: *const MapRequest, data_section: macho.section_64, raw_slice: []u8) void {
@@ -66,6 +99,13 @@ pub const OMap = struct {
 
         defer self.allocator.free(proc.stdout);
         defer self.allocator.free(proc.stderr);
+    }
+
+    pub fn close(self: OMap) void {
+        for (self.mappings.items) |item| {
+            item.close();
+        }
+        self.mappings.deinit();
     }
 };
 
