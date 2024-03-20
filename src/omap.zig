@@ -69,9 +69,28 @@ pub const MapRequest = struct {
     map_size: usize,
     region: []align(page_size) u8,
 
-    pub fn ask(size: usize) MapRequestError!?MapRequest {
+    pub fn ask(addr: ?u64, size: usize) MapRequestError!?MapRequest {
         const prot = macho.PROT.READ | macho.PROT.WRITE;
-        const flags = std.os.MAP.ANONYMOUS | std.os.MAP.PRIVATE;
+
+        // TODO: Ugly as hell... (to avoid comptime related error)
+        var flags: u32 = @as(u32, std.os.MAP.ANONYMOUS) | @as(u32, std.os.MAP.PRIVATE);
+        // if (addr != null) flags |= @as(u32, std.os.MAP.FIXED);
+
+        {
+            // ----- test zone ------
+            // flags = @as(u32, std.os.MAP.ANONYMOUS) | @as(u32, std.os.MAP.PRIVATE);
+            // var addr_request = undefined;
+            // if (addr != null) {
+            //     const int = addr.? & ~(page_size - 1);
+            //     addr_request = @as([*]align(page_size) u8, @ptrFromInt(int));
+            // } else addr_request = null;
+            // -----    end    -------
+            //
+        }
+        std.debug.print("\taddr: {x}\n", .{addr.?});
+        // const addr_request = if (addr != null) @as([*]align(page_size) u8, @ptrFromInt(addr.?)) else null;
+        // std.debug.print("\taddr: {x}\trequested addr: {*}\n", .{ addr.?, addr_request });
+
         const anon_map = std.os.mmap(null, size, prot, flags, -1, 0) catch |err| {
             std.debug.print("mmap err >>> {!}\n", .{err});
             return MapRequestError.MmapFailed;
@@ -86,7 +105,20 @@ pub const MapRequest = struct {
         };
     }
 
+    fn _region(addr_ptr: usize) []align(page_size) u8 {
+        // const ptr_to_int = @intFromPtr(addr_ptr);
+        var region: usize = addr_ptr & ~(page_size - 1);
+        var region_ptr: [*]align(page_size) u8 = @ptrFromInt(region);
+        const region_slice = region_ptr[0..page_size];
+
+        std.debug.print("region_ptr @ {*:<15}\n", .{region_ptr});
+        std.debug.print("region_len @ {d:<15}\n", .{region_slice.len});
+
+        return region_slice;
+    }
+
     pub fn write(self: MapRequest, comptime T: type, data: []T) void {
+        std.debug.print("Writing...\n", .{});
         const sect_data = data[0..data.len];
         const dest: []T = self.map[0..self.map_size];
         std.mem.copy(T, dest, sect_data);

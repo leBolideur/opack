@@ -105,7 +105,7 @@ pub const MachOFile = struct {
         self.odata.set_entrypoint_cmd(entrypoint_cmd);
     }
 
-    // Use to pick data form file and restore reader
+    // Used to pick data form file and restore reader
     pub fn pick(self: MachOFile, offset: u64, size: u64, buffer: *[]u8) !void {
         const seek_pos_bck = try self.file.getPos();
         try self.file.seekTo(offset);

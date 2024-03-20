@@ -38,44 +38,61 @@ pub const OPacker = struct {
 
         // ---------- init end -----------
 
-        const sect = try odata_ptr.get_text_sect() orelse {
+        const text_section_ = try odata_ptr.get_text_sect();
+        if (text_section_ == null) {
             std.debug.print("no __text section!\n", .{});
-            return;
-        };
+        }
+        const text_section = text_section_.?;
+
+        const data_section_ = try odata_ptr.get_data_sect();
+        if (data_section_ == null) {
+            std.debug.print("no __data section!\n", .{});
+        }
+        const data_section = data_section_.?;
 
         std.debug.print("\nMapping...\n\n", .{});
 
-        const request = try MapRequest.ask(4096) orelse {
-            std.debug.print("Response: nop!\n", .{});
+        const omap = OMap.init(&ofile, odata_ptr, raw_slice, &allocator);
+        // ------ __data --------
+        const data_region = try MapRequest.ask(data_section.addr, data_section.size) orelse {
+            std.debug.print("Response data_map: nop!\n", .{});
             return PackerError.MmapFailed;
         };
-        defer request.close();
+        defer data_region.close();
 
-        const fileoff = sect.offset;
-        const size = sect.size;
-        const sect_data = raw_slice[fileoff..(fileoff + size)];
+        const data_fileoff = data_section.offset;
+        const data_size = data_section.size;
+        const data_sect_raw = raw_slice[data_fileoff..(data_fileoff + data_size)];
+        try omap.debug_disas(data_sect_raw);
 
-        const region = request.region;
-        request.write(u8, sect_data);
-        request.mprotect(std.macho.PROT.READ | std.macho.PROT.EXEC);
+        // const data_region = data_map.region;
+        data_region.write(u8, data_sect_raw);
+        // data_region.mprotect(std.macho.PROT.READ | std.macho.PROT.EXEC);
 
-        std.debug.print("\nJumping @ 0x{*}...\n", .{region.ptr});
-        const jmp: *const fn () void = @ptrCast(region.ptr);
+        // -
+        // -
+        // -
+        // -
+
+        // ------ __text --------
+        const text_region = try MapRequest.ask(text_section.addr, text_section.size) orelse {
+            std.debug.print("Response text_map: nop!\n", .{});
+            return PackerError.MmapFailed;
+        };
+        defer text_region.close();
+
+        const text_fileoff = text_section.offset;
+        const text_size = text_section.size;
+        const text_sect_raw = raw_slice[text_fileoff..(text_fileoff + text_size)];
+        try omap.debug_disas(text_sect_raw);
+        text_region.write(u8, text_sect_raw);
+        text_region.mprotect(std.macho.PROT.READ | std.macho.PROT.EXEC);
+
+        std.debug.print("\nJumping @ 0x{*}...\n", .{text_region.region.ptr});
+        const jmp: *const fn () void = @ptrCast(text_region.region.ptr);
         jmp();
 
         std.debug.print("\nSo far, so good...\n", .{});
-
-        // return OPacker{
-        //     .odata = odata_ptr,
-        //     // .gpa_alloc = &allocator,
-        //     // .gpa = gpa,
-        // };
-    }
-
-    pub fn close(self: OPacker) void {
-        _ = self;
-        // self.odata.close();
-        // _ = self.gpa.deinit();
     }
 };
 

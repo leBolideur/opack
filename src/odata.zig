@@ -1,8 +1,13 @@
 const std = @import("std");
 const macho = std.macho;
 
-const LoadSegmentCmdError = error{NoText_Section};
-const ODataError_ = error{ AllocatorCreate, CreateSegmentCmd, NoText_Segment };
+const LoadSegmentCmdError = error{ NoText_Section, NoData_Section };
+const ODataError_ = error{
+    AllocatorCreate,
+    CreateSegmentCmd,
+    NoText_Segment,
+    NoData_Segment,
+};
 const ODataError = anyerror || LoadSegmentCmdError || ODataError_;
 
 const LoadSegmentCmd = struct {
@@ -39,10 +44,12 @@ const LoadSegmentCmd = struct {
         if (self.sections) |*sections| try sections.append(section);
     }
 
+    // Used in printer but is it really usefull ?
     pub fn vmem_size(self: *LoadSegmentCmd) u64 {
         return self.segment_cmd.vmaddr + self.segment_cmd.vmsize;
     }
 
+    // TODO: Refactor with get_section_by_name
     pub fn get_text_sect(self: *LoadSegmentCmd) ODataError!?macho.section_64 {
         for (self.sections.?.items) |sect| {
             const sectname = LoadSegmentCmd.sliceUntilZero(&sect.sectname);
@@ -52,6 +59,18 @@ const LoadSegmentCmd = struct {
         }
 
         return LoadSegmentCmdError.NoText_Section;
+    }
+
+    // TODO: Refactor with get_section_by_name
+    pub fn get_data_sect(self: *LoadSegmentCmd) ODataError!?macho.section_64 {
+        for (self.sections.?.items) |sect| {
+            const sectname = LoadSegmentCmd.sliceUntilZero(&sect.sectname);
+            if (std.mem.eql(u8, sectname, "__data")) {
+                return sect;
+            }
+        }
+
+        return LoadSegmentCmdError.NoData_Section;
     }
 
     pub fn close(self: *const LoadSegmentCmd) void {
@@ -117,6 +136,7 @@ pub const OData = struct {
         return null;
     }
 
+    // TODO: Refactor with get_segment_section_by_name
     pub fn get_text_sect(self: *OData) ODataError!?macho.section_64 {
         for (self.load_cmds.items) |cmd| {
             if (std.mem.eql(u8, cmd.segname, "__TEXT")) {
@@ -126,6 +146,18 @@ pub const OData = struct {
         }
 
         return ODataError_.NoText_Segment;
+    }
+
+    // TODO: Refactor with get_segment_section_by_name
+    pub fn get_data_sect(self: *OData) ODataError!?macho.section_64 {
+        for (self.load_cmds.items) |cmd| {
+            if (std.mem.eql(u8, cmd.segname, "__DATA")) {
+                const sect = cmd.get_data_sect();
+                return sect;
+            }
+        }
+
+        return ODataError_.NoData_Segment;
     }
 
     pub fn close(self: *OData) void {

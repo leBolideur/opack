@@ -1,4 +1,4 @@
-OBJS=bins/rlynodata.o
+OBJS=bins/hello.o
 
 ifdef DEBUG
 	DEBUGFLGS = -g
@@ -7,11 +7,11 @@ else
 endif
 
 
-bins/rlynodata: $(OBJS)
-	ld $(OBJS) -o bins/rlynodata -l System -syslibroot `xcrun --sdk macosx --show-sdk-path` -e main
+bins/hello: $(OBJS)
+	ld $(OBJS) -o bins/hello -l System -syslibroot `xcrun --sdk macosx --show-sdk-path` -e main
 
-bins/rlynodata.o: rlynodata.s
+bins/hello.o: hello.s
 	as $(DEBUGFLGS) $< -o $@
 
 clean:
-	rm bins/*.o rlynodata
+	rm bins/*.o hello

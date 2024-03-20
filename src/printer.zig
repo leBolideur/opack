@@ -30,11 +30,11 @@ pub fn print_debug(odata: *OData) void {
             format_prot(seg.segment_cmd.maxprot),
             format_prot(seg.segment_cmd.initprot),
         });
-        // if (seg.sections) |sections| {
-        //     for (sections.items) |sec| {
-        //         std.debug.print("    secname: {s:>16}\n", .{sec.sectname});
-        //     }
-        // }
+        if (seg.sections) |sections| {
+            for (sections.items) |sec| {
+                std.debug.print("    secname: {s:<24}addr: {x}\n", .{ sec.sectname, sec.addr });
+            }
+        }
     }
     std.debug.print("MAIN Entry: {x:>10}\n", .{odata.entrypoint_cmd.entryoff});
 }
