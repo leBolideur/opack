@@ -15,7 +15,7 @@ pub const SegmentType = enum { DATA, TEXT, Unknown };
 const LoadSegmentCmd = struct {
     segment_cmd: macho.segment_command_64,
     sections: ?std.ArrayList(macho.section_64),
-    segname: []u8,
+    segname: []const u8,
     type: ?SegmentType,
 
     gpa_alloc: *const std.mem.Allocator,
@@ -24,27 +24,24 @@ const LoadSegmentCmd = struct {
         segment_cmd: macho.segment_command_64,
         gpa_alloc: *const std.mem.Allocator,
     ) !*LoadSegmentCmd {
-        const segname = LoadSegmentCmd.sliceUntilZero(&segment_cmd.segname);
-
-        var segname_ptr = try gpa_alloc.alloc(u8, segname.len);
-        std.mem.copy(u8, segname_ptr, segname);
+        const segname = segment_cmd.segName();
 
         const ptr = try gpa_alloc.create(LoadSegmentCmd);
         ptr.* = LoadSegmentCmd{
             .segment_cmd = segment_cmd,
             .sections = null,
-            .segname = segname_ptr,
-            .type = @This().get_type_by_name(segname_ptr),
+            .segname = segname,
+            .type = @This().get_type_by_name(segname),
             .gpa_alloc = gpa_alloc,
         };
 
         return ptr;
     }
 
-    fn get_type_by_name(segname_ptr: []u8) SegmentType {
-        if (std.mem.eql(u8, segname_ptr, "__TEXT")) {
+    fn get_type_by_name(segname: []const u8) SegmentType {
+        if (std.mem.eql(u8, segname, "__TEXT")) {
             return SegmentType.TEXT;
-        } else if (std.mem.eql(u8, segname_ptr, "__DATA")) {
+        } else if (std.mem.eql(u8, segname, "__DATA")) {
             return SegmentType.DATA;
         }
         return SegmentType.Unknown;
@@ -65,8 +62,7 @@ const LoadSegmentCmd = struct {
     // TODO: Refactor with get_section_by_name
     pub fn get_text_sect(self: *LoadSegmentCmd) ODataError!?macho.section_64 {
         for (self.sections.?.items) |sect| {
-            const sectname = LoadSegmentCmd.sliceUntilZero(&sect.sectname);
-            if (std.mem.eql(u8, sectname, "__text")) {
+            if (std.mem.eql(u8, sect.sectName(), "__text")) {
                 return sect;
             }
         }
@@ -77,8 +73,7 @@ const LoadSegmentCmd = struct {
     // TODO: Refactor with get_section_by_name
     pub fn get_data_sect(self: *LoadSegmentCmd) ODataError!?macho.section_64 {
         for (self.sections.?.items) |sect| {
-            const sectname = LoadSegmentCmd.sliceUntilZero(&sect.sectname);
-            if (std.mem.eql(u8, sectname, "__data")) {
+            if (std.mem.eql(u8, sect.sectName(), "__data")) {
                 return sect;
             }
         }
@@ -88,17 +83,7 @@ const LoadSegmentCmd = struct {
 
     pub fn close(self: *const LoadSegmentCmd) void {
         if (self.sections) |sections| sections.deinit();
-        self.gpa_alloc.free(self.segname);
         self.gpa_alloc.destroy(self);
-    }
-
-    fn sliceUntilZero(arr: *const [16]u8) []const u8 {
-        for (arr, 0..) |byte, index| {
-            if (byte == 0) {
-                return arr[0..index];
-            }
-        }
-        return arr[0..];
     }
 };
 
@@ -106,6 +91,9 @@ pub const OData = struct {
     header: macho.mach_header_64,
     load_cmds: std.ArrayList(*LoadSegmentCmd),
     entrypoint_cmd: macho.entry_point_command,
+
+    symtab_cmd: macho.symtab_command,
+    symtab_entries: std.ArrayList(macho.nlist_64),
 
     gpa_alloc: *const std.mem.Allocator,
 
@@ -116,6 +104,10 @@ pub const OData = struct {
             .header = undefined,
             .load_cmds = std.ArrayList(*LoadSegmentCmd).init(gpa_alloc.*),
             .entrypoint_cmd = undefined,
+
+            .symtab_cmd = undefined,
+            .symtab_entries = std.ArrayList(macho.nlist_64).init(gpa_alloc.*),
+
             .gpa_alloc = gpa_alloc,
         };
 
@@ -130,6 +122,14 @@ pub const OData = struct {
         self.entrypoint_cmd = entrypoint_cmd;
     }
 
+    pub fn set_symtab_cmd(self: *OData, symtab_cmd: macho.symtab_command) void {
+        self.symtab_cmd = symtab_cmd;
+    }
+
+    pub fn add_symtab_entry(self: *OData, nlist: macho.nlist_64) !void {
+        try self.symtab_entries.append(nlist);
+    }
+
     pub fn create_segment_cmd(
         self: *OData,
         seg_cmd: macho.segment_command_64,
@@ -137,6 +137,27 @@ pub const OData = struct {
         const seg_struct: *LoadSegmentCmd = try LoadSegmentCmd.init(seg_cmd, self.gpa_alloc);
         try self.load_cmds.append(seg_struct);
         return seg_struct;
+    }
+
+    pub fn get_seg_by_index(self: *OData, index: u8) ?*macho.segment_command_64 {
+        for (self.load_cmds.items, 0..) |item, index_| {
+            if (index_ == index) return &item.segment_cmd;
+        }
+
+        return null;
+    }
+
+    pub fn segment_at(self: *OData, offset: u64) ?*macho.segment_command_64 {
+        for (self.load_cmds.items) |item| {
+            const start = item.segment_cmd.vmaddr;
+            const end = item.vmem_size();
+            if ((offset >= start) and (offset < end)) {
+                // std.debug.print("{x} - {x} - {x}\n", .{ start, offset, end });
+                return &item.segment_cmd;
+            }
+        }
+
+        return null;
     }
 
     pub fn get_textseg_cmd(self: *OData) ?*macho.segment_command_64 {
@@ -179,6 +200,7 @@ pub const OData = struct {
         }
 
         self.load_cmds.deinit();
+        self.symtab_entries.deinit();
         self.gpa_alloc.destroy(self);
     }
 };

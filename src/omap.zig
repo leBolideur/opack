@@ -46,47 +46,52 @@ pub const OMap = struct {
                 SegmentType.Unknown => continue,
             };
 
-            const section = section_.?;
+            const section: macho.section_64 = section_.?;
             var response = try MapRequest.ask(null, section.size) orelse {
                 std.debug.print("Response text_map: nop!\n", .{});
                 return MapRequestError.MmapFailed;
             };
             try self.mappings.append(response);
 
-            self.write_section_data(&response, section, raw_slice);
+            const data = self.write_section_data(&response, section, raw_slice);
             response.mprotect(std.macho.PROT.READ | std.macho.PROT.EXEC);
 
             if (seg_type == SegmentType.TEXT) {
                 std.debug.print("\nJumping @ 0x{*}...\n", .{response.region.?});
                 jmp = @ptrCast(response.region.?);
             }
+
+            self.debug_disas(data, section.addr) catch {};
         }
 
         return jmp;
     }
 
-    pub fn write_section_data(self: OMap, request: *const MapRequest, data_section: macho.section_64, raw_slice: []u8) void {
-        // _ = self;
+    pub fn write_section_data(
+        self: OMap,
+        request: *const MapRequest,
+        data_section: macho.section_64,
+        raw_slice: []u8,
+    ) []const u8 {
+        _ = self;
         const data_fileoff = data_section.offset;
         const data_size = data_section.size;
         const data_sect_raw = raw_slice[data_fileoff..(data_fileoff + data_size)];
 
         request.write(u8, data_sect_raw);
 
-        self.debug_disas(data_sect_raw, 0) catch {};
+        return data_sect_raw;
     }
 
-    pub fn debug_disas(self: OMap, data: []u8, offset: ?u64) !void {
+    pub fn debug_disas(self: OMap, data: []const u8, offset: u64) !void {
         // TODO: pipe stream
-        std.debug.print("\nDisassembling {s}...\n", .{self.ofile.filepath});
+        std.debug.print("\nDisassembling {s} with offset {?x}...\n", .{ self.ofile.filepath, offset });
         var tmp_file = try std.fs.cwd().createFile(".bin", .{ .truncate = true });
         defer tmp_file.close();
         try tmp_file.writeAll(data);
 
-        const size_u64 = comptime @sizeOf(u64);
-        var buf: [size_u64]u8 = undefined;
-        const offset_ = offset orelse 0;
-        const entry_offset = try std.fmt.bufPrint(buf[0..], "{}", .{offset_});
+        const entry_offset = try std.fmt.allocPrint(self.allocator.*, "{d}", .{offset});
+        defer self.allocator.free(entry_offset);
 
         const argv = [_][]const u8{ "radare2", "-b", "64", "-m", entry_offset, "-qc", "\"pd 10\"", ".bin" };
         var proc = try std.ChildProcess.exec(.{
@@ -95,7 +100,7 @@ pub const OMap = struct {
         });
 
         std.debug.print("{s}\n", .{proc.stdout});
-        std.debug.print("Err: {s}", .{proc.stderr});
+        // std.debug.print("Err: {s}", .{proc.stderr});
 
         defer self.allocator.free(proc.stdout);
         defer self.allocator.free(proc.stderr);

@@ -26,7 +26,8 @@ pub const OPacker = struct {
         const ofile = try MachOFile.load(args, odata_ptr);
         try ofile.parse();
         defer ofile.close();
-        printer.print_debug(odata_ptr);
+        printer.segment_cmds(odata_ptr);
+        printer.symtab(odata_ptr);
 
         const stats = try ofile.file.stat();
         var raw_slice = try allocator.alloc(u8, stats.size);
@@ -38,9 +39,10 @@ pub const OPacker = struct {
         defer omap.close();
 
         const jump: *const fn () void = try omap.map(raw_slice);
+        _ = jump;
 
         std.debug.print("\nJumping...\n", .{});
-        jump();
+        // jump();
 
         std.debug.print("\nSo far, so good...\n", .{});
     }

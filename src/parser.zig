@@ -77,8 +77,25 @@ pub const MachOFile = struct {
             switch (lcmd.cmd) {
                 macho.LC.SEGMENT_64 => try self.dump_segment_cmd(),
                 macho.LC.MAIN => try self.dump_entrypoint_cmd(),
+                macho.LC.SYMTAB => try self.dump_symtab_cmd(),
                 else => try self.file.seekBy(lcmd.cmdsize - @sizeOf(macho.load_command)),
             }
+        }
+    }
+
+    fn dump_symtab_cmd(self: MachOFile) ParserError!void {
+        try self.file.seekBy(-@sizeOf(macho.load_command));
+        const symtab_cmd = try self.safeReadStruct(macho.symtab_command);
+
+        self.odata.set_symtab_cmd(symtab_cmd);
+
+        const seek_pos_bck = try self.file.getPos();
+        defer self.file.seekTo(seek_pos_bck) catch {};
+
+        try self.file.seekTo(symtab_cmd.symoff);
+        for (0..symtab_cmd.nsyms) |_| {
+            const sym = try self.safeReadStruct(macho.nlist_64);
+            try self.odata.add_symtab_entry(sym);
         }
     }
 

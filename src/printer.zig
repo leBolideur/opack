@@ -1,4 +1,6 @@
 const std = @import("std");
+const macho = std.macho;
+
 const OData = @import("odata.zig").OData;
 
 fn format_prot(prot: std.macho.vm_prot_t) [3]u8 {
@@ -18,10 +20,10 @@ fn format_prot(prot: std.macho.vm_prot_t) [3]u8 {
     return buffer;
 }
 
-pub fn print_debug(odata: *OData) void {
+pub fn segment_cmds(odata: *OData) void {
     for (odata.load_cmds.items) |seg| {
         std.debug.print("{s:<15}fileoff: {x:<7}filesize: {d:<7}vmemrange: {x:0<9}..{x:<12}vmsize: {x:<12}maxprot: {s:<7}initprot: {s}\n", .{
-            seg.segname,
+            seg.segment_cmd.segName(),
             seg.segment_cmd.fileoff,
             seg.segment_cmd.filesize,
             seg.segment_cmd.vmaddr,
@@ -32,9 +34,21 @@ pub fn print_debug(odata: *OData) void {
         });
         if (seg.sections) |sections| {
             for (sections.items) |sec| {
-                std.debug.print("    secname: {s:<24}addr: {x}\n", .{ sec.sectname, sec.addr });
+                std.debug.print("    secname: {s:<20}addr: {x}\n", .{ sec.sectName(), sec.addr });
             }
         }
+        std.debug.print("\n", .{});
     }
-    std.debug.print("MAIN Entry: {x:>10}\n", .{odata.entrypoint_cmd.entryoff});
+    std.debug.print("MAIN Entry: {x:>10}\n\n", .{odata.entrypoint_cmd.entryoff});
+}
+
+pub fn symtab(odata: *OData) void {
+    std.debug.print("Symtab:\n", .{});
+    for (odata.symtab_entries.items) |nlist| {
+        if (nlist.sect()) {
+            const seg = odata.segment_at(nlist.n_value);
+            if (seg != null)
+                std.debug.print(">> @ 0x{x}\tin {s}\n", .{ nlist.n_value, seg.?.segname });
+        }
+    }
 }
