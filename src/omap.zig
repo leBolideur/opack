@@ -66,12 +66,14 @@ pub const OMap = struct {
     }
 
     pub fn write_section_data(self: OMap, request: *const MapRequest, data_section: macho.section_64, raw_slice: []u8) void {
-        _ = self;
+        // _ = self;
         const data_fileoff = data_section.offset;
         const data_size = data_section.size;
         const data_sect_raw = raw_slice[data_fileoff..(data_fileoff + data_size)];
 
         request.write(u8, data_sect_raw);
+
+        self.debug_disas(data_sect_raw, 0) catch {};
     }
 
     pub fn debug_disas(self: OMap, data: []u8, offset: ?u64) !void {
