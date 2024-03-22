@@ -39,13 +39,11 @@ pub const MachOFile = struct {
     pub fn parse(self: MachOFile) ParserError!void {
         const header = try self.dump_header();
         try self.list_load_commands(&header);
-        // self.file.close();
     }
 
     pub fn dump_all_raw(self: MachOFile, buffer: []u8) !void {
         try self.file.seekTo(0);
         _ = try self.reader.readAll(buffer);
-        // std.debug.print("All readed: {d}\n", .{bytes_readed});
         try self.file.seekTo(0);
     }
 
@@ -70,8 +68,6 @@ pub const MachOFile = struct {
     }
 
     pub fn list_load_commands(self: MachOFile, header: *const macho.mach_header_64) ParserError!void {
-        // try stdout.print("{d} load commands found\n\n", .{header.ncmds});
-
         for (0..header.ncmds) |_| {
             const lcmd = self.reader.readStruct(macho.load_command) catch return ReadError.ReadLoadCommand;
             switch (lcmd.cmd) {
@@ -107,14 +103,6 @@ pub const MachOFile = struct {
 
         for (0..seg64_cmd.nsects) |_| {
             const sect: macho.section_64 = try self.dump_section();
-            const name = sect.sectName();
-
-            // FIXME: Huhu
-            std.debug.print("secName: {s}\n", .{name});
-            if (std.mem.eql(u8, name, "__unwind_info")) {
-                std.debug.print("continue -- secName: {s}\n", .{name});
-                continue;
-            }
             try segment_cmd.add_section(sect);
         }
     }
@@ -132,10 +120,10 @@ pub const MachOFile = struct {
 
     // Used to pick data form file and restore reader
     pub fn pick(self: MachOFile, offset: u64, size: u64, buffer: *[]u8) !void {
+        _ = size;
         const seek_pos_bck = try self.file.getPos();
         try self.file.seekTo(offset);
-        const size_read = try self.reader.read(buffer.*);
-        std.debug.print("wanted: {d}\treaded: {d}\n", .{ size, size_read });
+        _ = try self.reader.read(buffer.*);
         try self.file.seekTo(seek_pos_bck);
     }
 

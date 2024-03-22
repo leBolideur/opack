@@ -45,7 +45,7 @@ pub const OPacker = struct {
         defer omap.close();
 
         _ = try omap.map();
-        const int: usize = @intFromPtr(omap.entry_text); // + odata_ptr.entrypoint_cmd.entryoff;
+        const int: usize = @intFromPtr(omap.entry_text);
         const add: usize = int + odata_ptr.entrypoint_cmd.entryoff;
         const to_ptr: [*]u8 = @ptrFromInt(add);
         std.debug.print("\nentry_text: {*}\nint: {x}\nadd: {x}\nto_ptr @ {*}...\n", .{ omap.entry_text, int, add, to_ptr });
@@ -54,8 +54,10 @@ pub const OPacker = struct {
 
         try pause();
         std.debug.print("\nJumping @ {*}...\n", .{to_ptr});
-        _ = j2;
-        jump();
+        _ = jump;
+        {
+            j2();
+        }
 
         std.debug.print("\nSo far, so good...\n", .{});
     }
