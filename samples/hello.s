@@ -7,7 +7,8 @@ main:
     adrp x1, msg@page
     # add x1, x1, #14
     # ldr x1, [x1, msg@pageoff]
-    ldr x2, =len
+    mov x2, #11
+    # [x2, len@pageoff]
     mov x16, #4
     svc 0
 
@@ -17,4 +18,4 @@ main:
 
 .data
     msg: .asciz "Hello, you"
-    len = . - msg
+    # len = . - msg

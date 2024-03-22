@@ -13,6 +13,12 @@ const GPAConfig = .{ .verbose_log = false };
 const MemoryError = error{MmapFailed};
 const PackerError = anyerror || MemoryError;
 
+fn pause() !void {
+    var input: [1]u8 = undefined;
+    const stdin = std.io.getStdIn().reader();
+    _ = try stdin.readUntilDelimiter(&input, '\n');
+}
+
 pub const OPacker = struct {
     pub fn init(args: *std.process.ArgIteratorPosix) !void {
         var gpa = std.heap.GeneralPurposeAllocator(GPAConfig){};
@@ -38,18 +44,19 @@ pub const OPacker = struct {
         var omap = OMap.init(&ofile, odata_ptr, raw_slice, &allocator);
         defer omap.close();
 
-        const jump: *const fn () void = try omap.map(raw_slice);
-        _ = jump;
+        _ = try omap.map();
+        const int: usize = @intFromPtr(omap.entry_text); // + odata_ptr.entrypoint_cmd.entryoff;
+        const add: usize = int + odata_ptr.entrypoint_cmd.entryoff;
+        const to_ptr: [*]u8 = @ptrFromInt(add);
+        std.debug.print("\nentry_text: {*}\nint: {x}\nadd: {x}\nto_ptr @ {*}...\n", .{ omap.entry_text, int, add, to_ptr });
+        const jump: *const fn () void = @alignCast(@ptrCast(to_ptr));
+        const j2: *const fn () void = @alignCast(@ptrCast(omap.entry_text));
 
-        std.debug.print("\nJumping...\n", .{});
-        // jump();
+        try pause();
+        std.debug.print("\nJumping @ {*}...\n", .{to_ptr});
+        _ = j2;
+        jump();
 
         std.debug.print("\nSo far, so good...\n", .{});
     }
 };
-
-fn pause() !void {
-    var input: [1]u8 = undefined;
-    const stdin = std.io.getStdIn().reader();
-    _ = try stdin.readUntilDelimiter(&input, '\n');
-}

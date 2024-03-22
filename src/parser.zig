@@ -106,7 +106,15 @@ pub const MachOFile = struct {
         const segment_cmd = try self.odata.create_segment_cmd(seg64_cmd);
 
         for (0..seg64_cmd.nsects) |_| {
-            const sect = try self.dump_section();
+            const sect: macho.section_64 = try self.dump_section();
+            const name = sect.sectName();
+
+            // FIXME: Huhu
+            std.debug.print("secName: {s}\n", .{name});
+            if (std.mem.eql(u8, name, "__unwind_info")) {
+                std.debug.print("continue -- secName: {s}\n", .{name});
+                continue;
+            }
             try segment_cmd.add_section(sect);
         }
     }
