@@ -54,11 +54,6 @@ const LoadSegmentCmd = struct {
         if (self.sections) |*sections| try sections.append(section);
     }
 
-    // Used in printer but is it really usefull ?
-    pub fn vmem_size(self: *LoadSegmentCmd) u64 {
-        return self.segment_cmd.vmaddr + self.segment_cmd.vmsize;
-    }
-
     // TODO: Refactor with get_section_by_name
     pub fn get_text_sect(self: *LoadSegmentCmd) ODataError!?macho.section_64 {
         for (self.sections.?.items) |sect| {
@@ -150,9 +145,8 @@ pub const OData = struct {
     pub fn segment_at(self: *OData, offset: u64) ?*macho.segment_command_64 {
         for (self.load_cmds.items) |item| {
             const start = item.segment_cmd.vmaddr;
-            const end = item.vmem_size();
+            const end = item.segment_cmd.vmsize;
             if ((offset >= start) and (offset < end)) {
-                // std.debug.print("{x} - {x} - {x}\n", .{ start, offset, end });
                 return &item.segment_cmd;
             }
         }

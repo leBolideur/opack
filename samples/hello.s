@@ -1,8 +1,13 @@
 .global main
-.align 4
+# .align 4
 
 .text
 main:
+eor x0, x0, x0   // x0 = 0
+eor x1, x1, x1   // x1 = 0
+eor x2, x2, x2   // x2 = 0
+eor x16, x16, x16   // x3 = 0
+
     mov x0, #1
     adrp x1, msg@page
     add x1, x1, msg@pageoff

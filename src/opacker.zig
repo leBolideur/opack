@@ -33,7 +33,7 @@ pub const OPacker = struct {
         try ofile.parse();
         defer ofile.close();
         printer.segment_cmds(odata_ptr);
-        printer.symtab(odata_ptr);
+        // printer.symtab(odata_ptr);
 
         const stats = try ofile.file.stat();
         var raw_slice = try allocator.alloc(u8, stats.size);
@@ -44,17 +44,24 @@ pub const OPacker = struct {
         var omap = OMap.init(&ofile, odata_ptr, raw_slice, &allocator);
         defer omap.close();
 
-        _ = try omap.map();
+        try omap.map();
         const int: usize = @intFromPtr(omap.entry_text);
         const add: usize = int + odata_ptr.entrypoint_cmd.entryoff;
         const to_ptr: [*]u8 = @ptrFromInt(add);
-        std.debug.print("\nentry_text: {*}\nint: {x}\nadd: {x}\nto_ptr @ {*}...\n", .{ omap.entry_text, int, add, to_ptr });
+        std.debug.print("\nentryoff: 0x{x}\nentry_text: {*}\nint: {x}\nadd: {x}\nto_ptr @ {*}...\n", .{
+            odata_ptr.entrypoint_cmd.entryoff,
+            omap.entry_text,
+            int,
+            add,
+            to_ptr,
+        });
         const jump: *const fn () void = @alignCast(@ptrCast(to_ptr));
         const j2: *const fn () void = @alignCast(@ptrCast(omap.entry_text));
 
         try pause();
-        std.debug.print("\nJumping @ {*}...\n", .{to_ptr});
+        std.debug.print("\nJumping @ {*}...\n", .{omap.entry_text});
         _ = jump;
+
         {
             j2();
         }

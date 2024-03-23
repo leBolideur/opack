@@ -27,19 +27,18 @@ pub fn segment_cmds(odata: *OData) void {
             seg.segment_cmd.fileoff,
             seg.segment_cmd.filesize,
             seg.segment_cmd.vmaddr,
-            seg.vmem_size(),
+            seg.segment_cmd.vmsize,
             seg.segment_cmd.vmsize,
             format_prot(seg.segment_cmd.maxprot),
             format_prot(seg.segment_cmd.initprot),
         });
         if (seg.sections) |sections| {
             for (sections.items) |sec| {
-                std.debug.print("    secname: {s:<20}addr: {x}\n", .{ sec.sectName(), sec.addr });
+                std.debug.print("  {s:<20}addr: {x}\n", .{ sec.sectName(), sec.addr });
             }
         }
         std.debug.print("\n", .{});
     }
-    std.debug.print("MAIN Entry: {x:>10}\n\n", .{odata.entrypoint_cmd.entryoff});
 }
 
 pub fn symtab(odata: *OData) void {
