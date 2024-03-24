@@ -12,7 +12,7 @@ const ODataError = anyerror || LoadSegmentCmdError || ODataError_;
 
 pub const SegmentType = enum { DATA, TEXT, Unknown };
 
-const LoadSegmentCmd = struct {
+pub const LoadSegmentCmd = struct {
     segment_cmd: macho.segment_command_64,
     sections: ?std.ArrayList(macho.section_64),
     segname: []const u8,

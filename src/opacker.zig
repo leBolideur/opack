@@ -32,7 +32,7 @@ pub const OPacker = struct {
         const ofile = try MachOFile.load(args, odata_ptr);
         try ofile.parse();
         defer ofile.close();
-        printer.segment_cmds(odata_ptr);
+        // printer.segment_cmds(odata_ptr);
         // printer.symtab(odata_ptr);
 
         const stats = try ofile.file.stat();
@@ -55,16 +55,14 @@ pub const OPacker = struct {
             add,
             to_ptr,
         });
-        const jump: *const fn () void = @alignCast(@ptrCast(to_ptr));
-        const j2: *const fn () void = @alignCast(@ptrCast(omap.entry_text));
+        // const jump: *const fn () void = @alignCast(@ptrCast(to_ptr));
+        // const j2: *const fn () void = @alignCast(@ptrCast(omap.entry_text));
 
-        try pause();
-        std.debug.print("\nJumping @ {*}...\n", .{omap.entry_text});
-        _ = jump;
+        // try pause();
+        std.debug.print("\nJumping @ {*}...\n", .{to_ptr});
+        // _ = jump;
 
-        {
-            j2();
-        }
+        // jump();
 
         std.debug.print("\nSo far, so good...\n", .{});
     }
