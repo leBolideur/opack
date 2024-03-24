@@ -31,22 +31,21 @@ pub fn segment_cmds(odata: *OData) void {
             format_prot(seg.segment_cmd.maxprot),
             format_prot(seg.segment_cmd.initprot),
         });
-        if (seg.sections) |sections| {
-            for (sections.items) |sec| {
-                std.debug.print("  {s:<20}addr: {x}\n", .{ sec.sectName(), sec.addr });
-            }
+        for (seg.sections.items) |sec| {
+            std.debug.print("  {s:<20}addr: {x}\n", .{ sec.sectName(), sec.addr });
         }
         std.debug.print("\n", .{});
     }
 }
 
-pub fn symtab(odata: *OData) void {
-    std.debug.print("Symtab:\n", .{});
-    for (odata.symtab_entries.items) |nlist| {
-        if (nlist.sect()) {
-            const seg = odata.segment_at(nlist.n_value);
-            if (seg != null)
-                std.debug.print(">> @ 0x{x}\tin {s}\n", .{ nlist.n_value, seg.?.segname });
-        }
-    }
-}
+// pub fn symtab(odata: *OData) void {
+//     std.debug.print("Symtab:\n", .{});
+//     for (odata.symtab_entries.items) |nlist| {
+//         if (nlist.sect()) {
+//             std.debug.print("nlist value: 0x{x}\n", .{nlist.n_value});
+//             const seg = odata.segment_at(nlist.n_value);
+//             if (seg != null)
+//                 std.debug.print(">> @ 0x{x}\tin {s}\n", .{ nlist.n_value, seg.?.segname });
+//         }
+//     }
+// }

@@ -14,8 +14,7 @@ pub const SegmentType = enum { DATA, TEXT, Unknown };
 
 pub const LoadSegmentCmd = struct {
     segment_cmd: macho.segment_command_64,
-    sections: ?std.ArrayList(macho.section_64),
-    segname: []const u8,
+    sections: std.ArrayList(macho.section_64),
     type: ?SegmentType,
 
     gpa_alloc: *const std.mem.Allocator,
@@ -24,14 +23,11 @@ pub const LoadSegmentCmd = struct {
         segment_cmd: macho.segment_command_64,
         gpa_alloc: *const std.mem.Allocator,
     ) !*LoadSegmentCmd {
-        const segname = segment_cmd.segName();
-
         const ptr = try gpa_alloc.create(LoadSegmentCmd);
         ptr.* = LoadSegmentCmd{
             .segment_cmd = segment_cmd,
-            .sections = null,
-            .segname = segname,
-            .type = @This().get_type_by_name(segname),
+            .sections = std.ArrayList(macho.section_64).init(gpa_alloc.*),
+            .type = @This().get_type_by_name(segment_cmd.segName()),
             .gpa_alloc = gpa_alloc,
         };
 
@@ -48,36 +44,33 @@ pub const LoadSegmentCmd = struct {
     }
 
     pub fn add_section(self: *LoadSegmentCmd, section: macho.section_64) !void {
-        if (self.sections == null) {
-            self.sections = std.ArrayList(macho.section_64).init(self.gpa_alloc.*);
-        }
-        if (self.sections) |*sections| try sections.append(section);
+        try self.sections.append(section);
     }
 
     // TODO: Refactor with get_section_by_name
-    pub fn get_text_sect(self: *LoadSegmentCmd) ODataError!?macho.section_64 {
-        for (self.sections.?.items) |sect| {
-            if (std.mem.eql(u8, sect.sectName(), "__text")) {
-                return sect;
-            }
-        }
+    // pub fn get_text_sect(self: *LoadSegmentCmd) ODataError!?macho.section_64 {
+    //     for (self.sections.?.items) |sect| {
+    //         if (std.mem.eql(u8, sect.sectName(), "__text")) {
+    //             return sect;
+    //         }
+    //     }
 
-        return LoadSegmentCmdError.NoText_Section;
-    }
+    //     return LoadSegmentCmdError.NoText_Section;
+    // }
 
     // TODO: Refactor with get_section_by_name
-    pub fn get_data_sect(self: *LoadSegmentCmd) ODataError!?macho.section_64 {
-        for (self.sections.?.items) |sect| {
-            if (std.mem.eql(u8, sect.sectName(), "__data")) {
-                return sect;
-            }
-        }
+    // pub fn get_data_sect(self: *LoadSegmentCmd) ODataError!?macho.section_64 {
+    //     for (self.sections.?.items) |sect| {
+    //         if (std.mem.eql(u8, sect.sectName(), "__data")) {
+    //             return sect;
+    //         }
+    //     }
 
-        return LoadSegmentCmdError.NoData_Section;
-    }
+    //     return LoadSegmentCmdError.NoData_Section;
+    // }
 
-    pub fn close(self: *const LoadSegmentCmd) void {
-        if (self.sections) |sections| sections.deinit();
+    pub fn close(self: *LoadSegmentCmd) void {
+        self.sections.deinit();
         self.gpa_alloc.destroy(self);
     }
 };
@@ -92,7 +85,7 @@ pub const OData = struct {
 
     gpa_alloc: *const std.mem.Allocator,
 
-    pub fn init(gpa_alloc: *std.mem.Allocator) !*OData {
+    pub fn init(gpa_alloc: *const std.mem.Allocator) !*OData {
         const ptr = gpa_alloc.create(OData) catch return ODataError.AllocatorCreateError;
 
         ptr.* = OData{
@@ -134,64 +127,65 @@ pub const OData = struct {
         return seg_struct;
     }
 
-    pub fn get_seg_by_index(self: *OData, index: u8) ?*macho.segment_command_64 {
-        for (self.load_cmds.items, 0..) |item, index_| {
-            if (index_ == index) return &item.segment_cmd;
-        }
+    // pub fn get_seg_by_index(self: *OData, index: u8) ?*macho.segment_command_64 {
+    //     for (self.load_cmds.items, 0..) |item, index_| {
+    //         if (index_ == index) return &item.segment_cmd;
+    //     }
 
-        return null;
-    }
+    //     return null;
+    // }
 
-    pub fn segment_at(self: *OData, offset: u64) ?*macho.segment_command_64 {
-        for (self.load_cmds.items) |item| {
-            const start = item.segment_cmd.vmaddr;
-            const end = item.segment_cmd.vmsize;
-            if ((offset >= start) and (offset < end)) {
-                return &item.segment_cmd;
-            }
-        }
+    // pub fn segment_at(self: *OData, offset: u64) ?*macho.segment_command_64 {
+    //     for (self.load_cmds.items) |item| {
+    //         const start = item.segment_cmd.vmaddr;
+    //         const end = item.segment_cmd.vmsize;
+    //         if ((offset >= start) and (offset < end)) {
+    //             std.debug.print("enter seg\n", .{});
+    //             return &item.segment_cmd;
+    //         }
+    //     }
 
-        return null;
-    }
+    //     return null;
+    // }
 
-    pub fn get_textseg_cmd(self: *OData) ?*macho.segment_command_64 {
-        for (self.load_cmds.items) |cmd| {
-            if (std.mem.eql(u8, cmd.segname, "__TEXT")) {
-                return &cmd.segment_cmd;
-            }
-        }
+    // pub fn get_textseg_cmd(self: *OData) ?*macho.segment_command_64 {
+    //     for (self.load_cmds.items) |cmd| {
+    //         if (std.mem.eql(u8, cmd.segname, "__TEXT")) {
+    //             return &cmd.segment_cmd;
+    //         }
+    //     }
 
-        return null;
-    }
-
-    // TODO: Refactor with get_segment_section_by_name
-    pub fn get_text_sect(self: *OData) ODataError!?macho.section_64 {
-        for (self.load_cmds.items) |cmd| {
-            if (std.mem.eql(u8, cmd.segname, "__TEXT")) {
-                const sect = cmd.get_text_sect();
-                return sect;
-            }
-        }
-
-        return ODataError_.NoText_Segment;
-    }
+    //     return null;
+    // }
 
     // TODO: Refactor with get_segment_section_by_name
-    pub fn get_data_sect(self: *OData) ODataError!?macho.section_64 {
-        for (self.load_cmds.items) |cmd| {
-            if (std.mem.eql(u8, cmd.segname, "__DATA")) {
-                const sect = cmd.get_data_sect();
-                return sect;
-            }
-        }
+    // pub fn get_text_sect(self: *OData) ODataError!?macho.section_64 {
+    //     for (self.load_cmds.items) |cmd| {
+    //         if (std.mem.eql(u8, cmd.segname, "__TEXT")) {
+    //             const sect = cmd.get_text_sect();
+    //             return sect;
+    //         }
+    //     }
 
-        return ODataError_.NoData_Segment;
-    }
+    //     return ODataError_.NoText_Segment;
+    // }
+
+    // TODO: Refactor with get_segment_section_by_name
+    // pub fn get_data_sect(self: *OData) ODataError!?macho.section_64 {
+    //     for (self.load_cmds.items) |cmd| {
+    //         if (std.mem.eql(u8, cmd.segname, "__DATA")) {
+    //             const sect = cmd.get_data_sect();
+    //             return sect;
+    //         }
+    //     }
+
+    //     return ODataError_.NoData_Segment;
+    // }
 
     pub fn close(self: *OData) void {
-        // for (self.load_cmds.items) |item| {
-        //     item.close();
-        // }
+        for (self.load_cmds.items) |item| {
+            item.close();
+        }
 
         self.load_cmds.deinit();
         self.symtab_entries.deinit();

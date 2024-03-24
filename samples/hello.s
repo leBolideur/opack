@@ -3,17 +3,11 @@
 
 .text
 main:
-eor x0, x0, x0   // x0 = 0
-eor x1, x1, x1   // x1 = 0
-eor x2, x2, x2   // x2 = 0
-eor x16, x16, x16   // x3 = 0
-
     mov x0, #1
     adrp x1, msg@page
     add x1, x1, msg@pageoff
 
     mov x2, len
-    # mov x2, #11
     mov x16, #4
     svc 0
 
@@ -24,6 +18,13 @@ eor x16, x16, x16   // x3 = 0
     mov x16, #4
     svc 0
 
+    mov x0, #1
+    adrp x1, msg3@page
+    add x1, x1, msg3@pageoff
+    mov x2, len3
+    mov x16, #4
+    svc 0
+
     mov x0, #0
     mov x16, #1
     svc 0
@@ -31,5 +32,7 @@ eor x16, x16, x16   // x3 = 0
 .data
     msg: .asciz "Hello, you\n"
     len = . - msg
-    msg2: .asciz "Hello, world!"
+    msg2: .asciz "Hello, world!\n"
     len2 = . - msg2
+    msg3: .asciz "blablabla... houhouhou\n"
+    len3 = . - msg3
