@@ -32,7 +32,7 @@ pub const OPacker = struct {
         const ofile = try MachOFile.load(args, odata_ptr);
         try ofile.parse();
         defer ofile.close();
-        // printer.segment_cmds(odata_ptr);
+        printer.segment_cmds(odata_ptr);
         // printer.symtab(odata_ptr);
 
         const stats = try ofile.file.stat();
@@ -42,11 +42,11 @@ pub const OPacker = struct {
         try ofile.dump_all_raw(raw_slice);
 
         var omap = OMap.init(&ofile, odata_ptr, raw_slice, &allocator);
-        defer omap.close();
+        // defer omap.close();
 
         try omap.map();
         const int: usize = @intFromPtr(omap.entry_text);
-        const add: usize = int + odata_ptr.entrypoint_cmd.entryoff;
+        const add: usize = int + 16220; // odata_ptr.entrypoint_cmd.entryoff;
         const to_ptr: [*]u8 = @ptrFromInt(add);
         std.debug.print("\nentryoff: 0x{x}\nentry_text: {*}\nint: {x}\nadd: {x}\nto_ptr @ {*}...\n", .{
             odata_ptr.entrypoint_cmd.entryoff,
@@ -55,14 +55,14 @@ pub const OPacker = struct {
             add,
             to_ptr,
         });
-        // const jump: *const fn () void = @alignCast(@ptrCast(to_ptr));
+        const jump: *const fn () void = @alignCast(@ptrCast(to_ptr));
         // const j2: *const fn () void = @alignCast(@ptrCast(omap.entry_text));
 
         // try pause();
         std.debug.print("\nJumping @ {*}...\n", .{to_ptr});
         // _ = jump;
 
-        // jump();
+        jump();
 
         std.debug.print("\nSo far, so good...\n", .{});
     }

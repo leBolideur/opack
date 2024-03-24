@@ -9,7 +9,7 @@ const SegmentType = odata_import.SegmentType;
 
 const page_size: usize = std.mem.page_size; // TODO: Find a way to get system page_size
 
-const MapRequestError = error{MmapFailed};
+const MapRequestError = anyerror || error{MmapFailed};
 const MapperError = anyerror || MapRequestError;
 
 fn pause() !void {
@@ -22,9 +22,9 @@ pub const OMap = struct {
     ofile: *const OFile,
     odata: *OData,
     raw_slice: []u8,
-    mappings: std.ArrayList(MapRequest),
-    base_addr: [*]align(page_size) u8,
-    entry_text: [*]align(page_size) u8,
+    mappings: std.ArrayList(*MapRequest),
+    base_addr: ?[*]align(page_size) u8,
+    entry_text: ?[*]align(page_size) u8,
 
     allocator: *std.mem.Allocator,
 
@@ -38,16 +38,14 @@ pub const OMap = struct {
             .ofile = ofile,
             .odata = odata,
             .raw_slice = raw_slice,
-            .mappings = std.ArrayList(MapRequest).init(allocator.*),
-            .base_addr = undefined,
-            .entry_text = undefined,
+            .mappings = std.ArrayList(*MapRequest).init(allocator.*),
+            .base_addr = null,
+            .entry_text = null,
             .allocator = allocator,
         };
     }
 
     pub fn map(self: *OMap) !void {
-        // std.debug.print("\nMapping...\n", .{});
-
         for (self.odata.load_cmds.items) |seg| {
             const seg_type = seg.type orelse break;
             switch (seg_type) {
@@ -79,19 +77,18 @@ pub const OMap = struct {
         self: *OMap,
         segment: *LoadSegmentCmd,
         request_addr: ?[*]align(page_size) u8,
-    ) !MapRequest {
-        const response = try MapRequest.ask(request_addr, segment.segment_cmd.vmsize) orelse {
-            std.debug.print("Response map_segment: nop!\n", .{});
-            return MapRequestError.MmapFailed;
-        };
-
-        try self.mappings.append(response);
-
+    ) !*MapRequest {
         // self.write_segment_data(&response, segment.segment_cmd, self.raw_slice);
         const data_fileoff = segment.segment_cmd.fileoff;
         const data_size = segment.segment_cmd.filesize;
         const data_segment_raw = self.raw_slice[data_fileoff..][0..data_size];
-        std.debug.print("data.len: {d}\n", .{data_segment_raw.len});
+        std.debug.print("data_fileoff: {d}\tdata_size: {d}\tdata: \n{s}\n", .{ data_fileoff, data_size, data_segment_raw });
+        const response = try MapRequest.ask(self.allocator, request_addr, segment.segment_cmd.vmsize) orelse {
+            std.debug.print("Response map_segment: nop!\n", .{});
+            return MapRequestError.MmapFailed;
+        };
+        try self.mappings.append(response);
+
         response.write(u8, data_segment_raw);
 
         return response;
@@ -122,7 +119,6 @@ pub const OMap = struct {
 
     pub fn close(self: OMap) void {
         for (self.mappings.items) |item| {
-            std.debug.print("request close @ {*}\n", .{item.map.ptr});
             item.close();
         }
         self.mappings.deinit();
@@ -132,18 +128,18 @@ pub const OMap = struct {
 pub const MapRequest = struct {
     map: []align(page_size) u8,
     map_size: usize,
+    allocator: *std.mem.Allocator,
     // data: ?[]u8,
 
-    pub fn ask(addr: ?[*]align(page_size) u8, size: usize) MapRequestError!?MapRequest {
+    pub fn ask(allocator: *std.mem.Allocator, addr: ?[*]align(page_size) u8, size: usize) MapRequestError!?*MapRequest {
         // TODO: Ugly as hell... (to avoid comptime related error)
         var flags: u32 = @as(u32, std.os.MAP.ANONYMOUS) | @as(u32, std.os.MAP.PRIVATE);
 
         var req: ?[*]align(page_size) u8 = null;
         if (addr != null) {
-            pause() catch {};
             flags |= @as(u32, std.os.MAP.FIXED);
             req = MapRequest.align_low(addr.?);
-            std.debug.print("requested addr: {*}\taligned addr: {*}\n", .{ addr.?, req.? });
+            // std.debug.print("requested addr: {*}\taligned addr: {*}\n", .{ addr.?, req.? });
         }
 
         const prot = macho.PROT.READ | macho.PROT.WRITE;
@@ -152,13 +148,17 @@ pub const MapRequest = struct {
             return MapRequestError.MmapFailed;
         };
         std.debug.print("ok for size: {d} @ {*}\n", .{ size, anon_map.ptr });
-        pause() catch {};
 
-        return MapRequest{
+        var ptr = try allocator.create(MapRequest);
+
+        ptr.* = MapRequest{
             .map = anon_map,
             .map_size = size,
+            .allocator = allocator,
             // .data = undefined,
         };
+
+        return ptr;
     }
 
     pub fn write(self: MapRequest, comptime T: type, data: []T) void {
@@ -185,8 +185,9 @@ pub const MapRequest = struct {
         return ptr;
     }
 
-    pub fn close(self: MapRequest) void {
-        std.debug.print("request close @ {*}\n", .{self.map.ptr});
+    pub fn close(self: *MapRequest) void {
+        std.debug.print("close - ptr: {*}\tlen: {d}\n", .{ self.map.ptr, self.map.len });
         std.os.munmap(self.map);
+        self.allocator.destroy(self);
     }
 };

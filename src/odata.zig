@@ -189,9 +189,9 @@ pub const OData = struct {
     }
 
     pub fn close(self: *OData) void {
-        for (self.load_cmds.items) |item| {
-            item.close();
-        }
+        // for (self.load_cmds.items) |item| {
+        //     item.close();
+        // }
 
         self.load_cmds.deinit();
         self.symtab_entries.deinit();
