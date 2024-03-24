@@ -7,7 +7,7 @@ const OData = odata_import.OData;
 const LoadSegmentCmd = odata_import.LoadSegmentCmd;
 const SegmentType = odata_import.SegmentType;
 
-const page_size: usize = 0x4000; // TODO: Find a way to get system page_size
+const page_size: usize = std.mem.page_size; // TODO: Find a way to get system page_size
 
 const MapRequestError = error{MmapFailed};
 const MapperError = anyerror || MapRequestError;
@@ -75,18 +75,6 @@ pub const OMap = struct {
         }
     }
 
-    // fn map_segment(self: *OMap, section: macho.section_64, request_addr: ?[*]align(page_size) u8) !MapRequest {
-    //     var response = try MapRequest.ask(request_addr, section.size) orelse {
-    //         std.debug.print("Response map_segment: nop!\n", .{});
-    //         return MapRequestError.MmapFailed;
-    //     };
-    //     try self.mappings.append(response);
-
-    //     self.write_section_data(&response, section, self.raw_slice);
-
-    //     return response;
-    // }
-
     fn map_all_segment(
         self: *OMap,
         segment: *LoadSegmentCmd,
@@ -108,35 +96,6 @@ pub const OMap = struct {
 
         return response;
     }
-
-    // pub fn write_section_data(
-    //     self: OMap,
-    //     request: *MapRequest,
-    //     data_section: macho.section_64,
-    //     raw_slice: []u8,
-    // ) void {
-    //     _ = self;
-    //     const data_fileoff = data_section.offset;
-    //     const data_size = data_section.size;
-    //     const data_sect_raw = raw_slice[data_fileoff..(data_fileoff + data_size)];
-
-    //     request.write(u8, data_sect_raw);
-    // }
-
-    // pub fn write_segment_data(
-    //     self: OMap,
-    //     request: *const MapRequest,
-    //     segment: macho.segment_command_64,
-    //     raw_slice: []u8,
-    // ) void {
-    //     _ = self;
-    //     const data_fileoff = segment.fileoff;
-    //     const data_size = segment.filesize;
-    //     const data_segment_raw = raw_slice[data_fileoff..][0..data_size];
-    //     std.debug.print("data.len: {d}\n", .{data_segment_raw.len});
-
-    //     request.write(u8, data_segment_raw);
-    // }
 
     pub fn debug_disas(self: OMap, data: []const u8, offset: u64) !void {
         // TODO: pipe stream
