@@ -45,7 +45,6 @@ pub const OMap = struct {
 
     pub fn map(self: *OMap) !void {
         std.debug.print("Region @ {*}\n", .{self.map_request.global.ptr});
-        pause() catch {};
         for (self.odata.load_cmds.items) |seg| {
             const seg_type = seg.type orelse break;
             switch (seg_type) {
@@ -55,7 +54,6 @@ pub const OMap = struct {
                     self.map_request.mprotect(response, std.macho.PROT.READ | std.macho.PROT.EXEC);
 
                     self.entry_text = response.ptr;
-                    pause() catch {};
                 },
                 SegmentType.DATA => {
                     std.debug.print("\n__DATA\n", .{});
@@ -64,7 +62,6 @@ pub const OMap = struct {
                     const int_data = @intFromPtr(response.ptr);
                     const int_entry_text = @intFromPtr(self.entry_text);
                     std.debug.print("offset .data - .text: {x}\n", .{int_data - int_entry_text});
-                    pause() catch {};
                 },
                 SegmentType.Unknown => continue,
             }
@@ -115,7 +112,7 @@ pub const OMap = struct {
 
 pub const MapRequest = struct {
     global: []align(page_size) u8,
-    offset: usize,
+    // offset: usize,
     cursor: [*]align(page_size) u8,
     allocator: *const std.mem.Allocator,
 
@@ -130,7 +127,7 @@ pub const MapRequest = struct {
         var ptr = try allocator.create(MapRequest);
         ptr.* = MapRequest{
             .global = anon_map,
-            .offset = 0,
+            // .offset = 0,
             .cursor = anon_map.ptr,
             .allocator = allocator,
         };
@@ -143,7 +140,7 @@ pub const MapRequest = struct {
 
         const dest = self.cursor[0..data.len];
         std.mem.copy(u8, dest, data);
-        self.offset += data.len;
+        // self.offset += data.len;
 
         const new = &self.global[data.len];
         const cursor = MapRequest.align_low(new);
