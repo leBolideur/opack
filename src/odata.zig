@@ -15,7 +15,7 @@ pub const SegmentType = enum { DATA, TEXT, Unknown };
 pub const LoadSegmentCmd = struct {
     segment_cmd: macho.segment_command_64,
     sections: std.ArrayList(macho.section_64),
-    type: ?SegmentType,
+    type: SegmentType,
 
     gpa_alloc: *const std.mem.Allocator,
 
@@ -102,6 +102,19 @@ pub const OData = struct {
         return ptr;
     }
 
+    pub fn segments_total_size(self: OData) usize {
+        var size: usize = 0;
+        for (self.load_cmds.items) |seg| {
+            size += seg.segment_cmd.filesize;
+            // switch (seg.type) {
+            //     SegmentType.DATA => size += seg.segment_cmd.filesize,
+            //     SegmentType.TEXT => size += seg.segment_cmd.filesize,
+            //     SegmentType.Unknown => continue,
+            // }
+        }
+        return size;
+    }
+
     pub fn set_header(self: *OData, header: macho.mach_header_64) void {
         self.header = header;
     }
@@ -135,18 +148,18 @@ pub const OData = struct {
     //     return null;
     // }
 
-    // pub fn segment_at(self: *OData, offset: u64) ?*macho.segment_command_64 {
-    //     for (self.load_cmds.items) |item| {
-    //         const start = item.segment_cmd.vmaddr;
-    //         const end = item.segment_cmd.vmsize;
-    //         if ((offset >= start) and (offset < end)) {
-    //             std.debug.print("enter seg\n", .{});
-    //             return &item.segment_cmd;
-    //         }
-    //     }
+    pub fn segment_at(self: *OData, offset: u64) ?*macho.segment_command_64 {
+        for (self.load_cmds.items) |item| {
+            const start = item.segment_cmd.vmaddr;
+            const end = item.segment_cmd.vmsize;
+            if ((offset >= start) and (offset < end)) {
+                std.debug.print("enter seg\n", .{});
+                return &item.segment_cmd;
+            }
+        }
 
-    //     return null;
-    // }
+        return null;
+    }
 
     // pub fn get_textseg_cmd(self: *OData) ?*macho.segment_command_64 {
     //     for (self.load_cmds.items) |cmd| {

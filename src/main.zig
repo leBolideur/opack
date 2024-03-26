@@ -27,7 +27,7 @@ pub fn main() !void {
     const odata = try OData.init(&allocator);
     defer odata.close();
 
-    const ofile = try MachOFile.load(&args, odata);
+    const ofile = try MachOFile.load(&args, odata, &allocator);
     try ofile.parse();
     defer ofile.close();
 
@@ -40,23 +40,26 @@ pub fn main() !void {
     var omap = try OMap.init(&ofile, odata, raw_slice, &allocator);
     defer omap.close();
 
-    try omap.map();
+    // try omap.map();
 
-    const int: usize = @intFromPtr(omap.entry_text);
-    const add: usize = int + odata.entrypoint_cmd.entryoff;
-    const to_ptr: [*]u8 = @ptrFromInt(add);
-    std.debug.print("\nentryoff: 0x{x}\nentry_text: {*}\nint: {x}\nadd: {x}\nto_ptr @ {*}...\n", .{
-        odata.entrypoint_cmd.entryoff,
-        omap.entry_text,
-        int,
-        add,
-        to_ptr,
-    });
+    // const int: usize = @intFromPtr(omap.entry_text);
+    // const add: usize = int + odata.entrypoint_cmd.entryoff;
+    // const to_ptr: [*]u8 = @ptrFromInt(add);
+    // std.debug.print("\nentryoff: 0x{x}\nentry_text: {*}\nint: {x}\nadd: {x}\nto_ptr @ {*}...\n", .{
+    //     odata.entrypoint_cmd.entryoff,
+    //     omap.entry_text,
+    //     int,
+    //     add,
+    //     to_ptr,
+    // });
 
-    const jump: *const fn () void = @alignCast(@ptrCast(to_ptr));
-    jump();
+    // const jump: *const fn () u32 = @alignCast(@ptrCast(to_ptr));
+    // try printer.pause();
+    // const ret = jump();
 
-    std.debug.print("So far, so good!\n", .{});
+    // std.debug.print("ret: {d}\n", .{ret});
+    // std.debug.print("So far, so good!\n", .{});
 
     // printer.segment_cmds(odata);
+    printer.symtab(odata);
 }

@@ -12,12 +12,6 @@ const page_size: usize = std.mem.page_size;
 const MapRequestError = anyerror || error{MmapFailed};
 const MapperError = anyerror || MapRequestError;
 
-fn pause() !void {
-    var input: [1]u8 = undefined;
-    const stdin = std.io.getStdIn().reader();
-    _ = try stdin.readUntilDelimiter(&input, '\n');
-}
-
 pub const OMap = struct {
     ofile: *const OFile,
     odata: *OData,
@@ -33,12 +27,14 @@ pub const OMap = struct {
         raw_slice: []u8,
         allocator: *const std.mem.Allocator,
     ) !OMap {
+        const segments_total_size = odata.segments_total_size();
+        std.debug.print("segments_total_size: {x}\n", .{segments_total_size});
         return OMap{
             .ofile = ofile,
             .odata = odata,
             .raw_slice = raw_slice,
             .entry_text = null,
-            .map_request = try MapRequest.init(allocator, 0x8000),
+            .map_request = try MapRequest.init(allocator, segments_total_size),
             .allocator = allocator,
         };
     }
@@ -46,8 +42,7 @@ pub const OMap = struct {
     pub fn map(self: *OMap) !void {
         std.debug.print("Region @ {*}\n", .{self.map_request.global.ptr});
         for (self.odata.load_cmds.items) |seg| {
-            const seg_type = seg.type orelse break;
-            switch (seg_type) {
+            switch (seg.type) {
                 SegmentType.TEXT => {
                     std.debug.print("__TEXT\n", .{});
                     const response = try self.map_all_segment(seg);
@@ -63,7 +58,10 @@ pub const OMap = struct {
                     const int_entry_text = @intFromPtr(self.entry_text);
                     std.debug.print("offset .data - .text: {x}\n", .{int_data - int_entry_text});
                 },
-                SegmentType.Unknown => continue,
+                SegmentType.Unknown => {
+                    std.debug.print("\nOther: {?}\n", .{seg.type});
+                    // _ = try self.map_all_segment(seg);
+                },
             }
         }
     }
@@ -75,7 +73,7 @@ pub const OMap = struct {
         const data_fileoff = segment.segment_cmd.fileoff;
         const data_size = segment.segment_cmd.filesize;
         const data_segment_raw = self.raw_slice[data_fileoff..][0..data_size];
-        // std.debug.print("data_fileoff: {d}\tdata_size: {d}\n", .{ data_fileoff, data_size });
+        std.debug.print("data_fileoff: {d}\tdata_size: {d}\n", .{ data_fileoff, data_size });
 
         const response = self.map_request.write(data_segment_raw);
 

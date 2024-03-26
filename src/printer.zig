@@ -3,6 +3,12 @@ const macho = std.macho;
 
 const OData = @import("odata.zig").OData;
 
+pub fn pause() !void {
+    var input: [1]u8 = undefined;
+    const stdin = std.io.getStdIn().reader();
+    _ = try stdin.readUntilDelimiter(&input, '\n');
+}
+
 fn format_prot(prot: std.macho.vm_prot_t) [3]u8 {
     const PROT = std.macho.PROT;
     var buffer = [3]u8{ '-', '-', '-' };
@@ -38,14 +44,14 @@ pub fn segment_cmds(odata: *OData) void {
     }
 }
 
-// pub fn symtab(odata: *OData) void {
-//     std.debug.print("Symtab:\n", .{});
-//     for (odata.symtab_entries.items) |nlist| {
-//         if (nlist.sect()) {
-//             std.debug.print("nlist value: 0x{x}\n", .{nlist.n_value});
-//             const seg = odata.segment_at(nlist.n_value);
-//             if (seg != null)
-//                 std.debug.print(">> @ 0x{x}\tin {s}\n", .{ nlist.n_value, seg.?.segname });
-//         }
-//     }
-// }
+pub fn symtab(odata: *OData) void {
+    std.debug.print("Symtab:\n", .{});
+    for (odata.symtab_entries.items) |nlist| {
+        // if (nlist.sect()) {
+        // std.debug.print("nlist value: 0x{x}\n", .{nlist.n_value});
+        const seg = odata.segment_at(nlist.n_value);
+        if (seg != null)
+            std.debug.print(">> @ 0x{x}\tin {s}\n", .{ nlist.n_value, seg.?.segname });
+        // }
+    }
+}

@@ -25,9 +25,10 @@ main:
     mov x16, #4
     svc 0
 
-    mov x0, #0
-    mov x16, #1
-    svc 0
+    # mov x0, #0
+    # mov x16, #1
+    # svc 0
+    ret
 
 .data
     msg: .asciz "Hello, you\n"

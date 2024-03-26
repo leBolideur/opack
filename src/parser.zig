@@ -20,7 +20,9 @@ pub const MachOFile = struct {
 
     odata: *OData,
 
-    pub fn load(args: *std.process.ArgIteratorPosix, odata: *OData) ParserError!MachOFile {
+    allocator: *std.mem.Allocator,
+
+    pub fn load(args: *std.process.ArgIteratorPosix, odata: *OData, allocator: *std.mem.Allocator) ParserError!MachOFile {
         _ = args.skip();
         const filepath = args.next().?;
         const file = std.fs.cwd().openFile(filepath, .{}) catch |err| {
@@ -33,6 +35,7 @@ pub const MachOFile = struct {
             .file = file,
             .reader = file.reader(),
             .odata = odata,
+            .allocator = allocator,
         };
     }
 
@@ -71,9 +74,12 @@ pub const MachOFile = struct {
         for (0..header.ncmds) |_| {
             const lcmd = self.reader.readStruct(macho.load_command) catch return ReadError.ReadLoadCommand;
             switch (lcmd.cmd) {
-                macho.LC.SEGMENT_64 => try self.dump_segment_cmd(),
+                macho.LC.SEGMENT_64 => {
+                    try self.dump_segment_cmd();
+                },
                 macho.LC.MAIN => try self.dump_entrypoint_cmd(),
                 macho.LC.SYMTAB => try self.dump_symtab_cmd(),
+                macho.LC.DYSYMTAB => try self.dump_dysymtab_cmd(),
                 else => try self.file.seekBy(lcmd.cmdsize - @sizeOf(macho.load_command)),
             }
         }
@@ -88,11 +94,45 @@ pub const MachOFile = struct {
         const seek_pos_bck = try self.file.getPos();
         defer self.file.seekTo(seek_pos_bck) catch {};
 
+        const strings_table = symtab_cmd.stroff;
+        try self.file.seekTo(strings_table);
+        var buffer = try self.allocator.alloc(u8, symtab_cmd.strsize);
+        defer self.allocator.free(buffer);
+        _ = try self.reader.readAtLeast(buffer, symtab_cmd.strsize);
+
         try self.file.seekTo(symtab_cmd.symoff);
         for (0..symtab_cmd.nsyms) |_| {
             const sym = try self.safeReadStruct(macho.nlist_64);
+
+            const start = sym.n_strx;
+            const null_char = "\x00";
+            const end = std.mem.indexOf(u8, buffer[start..], null_char) orelse {
+                std.debug.print("Chaîne non terminée par null.\n", .{});
+                return;
+            };
+            const name = buffer[start..(start + end)];
+            if (sym.undf())
+                std.debug.print("sym name: {s}\n", .{name});
+
             try self.odata.add_symtab_entry(sym);
         }
+    }
+
+    fn dump_dysymtab_cmd(self: MachOFile) ParserError!void {
+        try self.file.seekBy(-@sizeOf(macho.load_command));
+        // const dysymtab_cmd = try self.safeReadStruct(macho.dysymtab_command);
+        // std.debug.print("dysymtab: \n{?}\n", .{dysymtab_cmd});
+
+        // self.odata.set_symtab_cmd(symtab_cmd);
+
+        const seek_pos_bck = try self.file.getPos();
+        defer self.file.seekTo(seek_pos_bck) catch {};
+
+        // try self.file.seekTo(dysymtab_cmd.symoff);
+        // for (0..symtab_cmd.nsyms) |_| {
+        //     const sym = try self.safeReadStruct(macho.nlist_64);
+        //     try self.odata.add_symtab_entry(sym);
+        // }
     }
 
     fn dump_segment_cmd(self: MachOFile) ParserError!void {
@@ -109,7 +149,20 @@ pub const MachOFile = struct {
 
     fn dump_section(self: MachOFile) !macho.section_64 {
         const section = try self.safeReadStruct(macho.section_64);
+        if (std.mem.eql(u8, section.sectName(), "__got")) {
+            // std.debug.print("\n__got:{?}\n", .{section});
+            try self.dump_got();
+        }
         return section;
+    }
+
+    fn dump_got(self: MachOFile) !void {
+        const seek_bck = try self.file.getPos();
+        defer self.file.seekTo(seek_bck) catch {};
+
+        var buffer: [100]u8 = undefined;
+        _ = try self.reader.read(&buffer);
+        std.debug.print("__got:\n{s}\n", .{buffer});
     }
 
     fn dump_entrypoint_cmd(self: MachOFile) ParserError!void {
